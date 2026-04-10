@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PrynScribe Pro</title>
+  <link rel="stylesheet" href="../css/theme.css">
+  <style>
+    body { background-color: #000000; margin: 0; padding: 0; }
+  </style>
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; padding: 0 8px;">
+      <div style="display: flex; align-items: center; gap: 14px;">
+         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M5.07 5.07l13.86 13.86M18.93 5.07L5.07 18.93"/></svg>
+         <span class="brand" style="font-size: 20px; font-weight: 900; letter-spacing: -1px; color: #fff; text-transform: uppercase;">PRYNSCRIBE</span>
+      </div>
+      <button id="view-library" style="background:none; border:none; cursor:pointer; color: #666; transition: color 0.2s;">
+         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      </button>
+    </div>
+
+    <!-- Session Console (Enlarged) -->
+    <div class="pro-card-popup" style="text-align: center; margin-bottom: 24px;">
+      <div id="status-label" class="label-pro" style="font-size: 10px; margin-bottom: 4px;">SYSTEM CONNECTED</div>
+      
+      <div id="timer-display" style="font-family: 'JetBrains Mono', monospace; font-size: 48px; font-weight: 800; margin: 10px 0; color: #fff; letter-spacing: -2px;">00:00</div>
+      
+      <div id="wave-viz" class="wave-pro" style="display: none; justify-content: center; align-items: center; gap: 4px; margin: 20px 0; height: 40px;">
+         <div class="wave-bar-pro" style="animation-delay: 0.1s;"></div>
+         <div class="wave-bar-pro" style="animation-delay: 0.2s;"></div>
+         <div class="wave-bar-pro" style="animation-delay: 0.3s;"></div>
+         <div class="wave-bar-pro" style="animation-delay: 0.2s;"></div>
+         <div class="wave-bar-pro" style="animation-delay: 0.1s;"></div>
+      </div>
+
+      <button id="actionBtn" class="btn-pill btn-pill-primary" style="margin-top: 24px;">
+         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
+         <span>START SESSION</span>
+      </button>
+
+      <!-- LIVE TELEMETRY CONSOLES -->
+      <div id="telemetry-panels" style="display: none; margin-top: 24px; text-align: left; background: #0a0a0a; border: 1px solid #222; border-radius: 12px; padding: 12px;">
+          <div style="font-size: 10px; font-weight: 800; color: #666; margin-bottom: 8px; text-transform: uppercase;">1. Live Scribe (Deepgram)</div>
+          <div id="popup-verbatim" style="width: 100%; height: 80px; background: #000; border: 1px solid #111; border-radius: 8px; color: #a1a1aa; font-family: monospace; font-size: 10px; padding: 8px; overflow-y: auto; margin-bottom: 12px;">Waiting for audio stream...</div>
+
+          <div style="font-size: 10px; font-weight: 800; color: #666; margin-bottom: 8px; text-transform: uppercase;">2. Pipeline Intel (Groq 8B)</div>
+          <div id="popup-chunks" style="width: 100%; height: 60px; background: #000; border: 1px solid #111; border-radius: 8px; color: #6366f1; font-family: monospace; font-size: 10px; padding: 8px; overflow-y: auto; margin-bottom: 12px;">Waiting for chunks...</div>
+
+          <div style="font-size: 10px; font-weight: 800; color: #666; margin-bottom: 8px; text-transform: uppercase;">3. Master Synthesis</div>
+          <div id="popup-synthesis" style="width: 100%; height: 60px; background: #000; border: 1px solid #111; border-radius: 8px; color: #10b981; font-family: monospace; font-size: 10px; padding: 8px; overflow-y: auto;">Awaiting compilation...</div>
+      </div>
+    </div>
+
+    <!-- Settings Card (Velocity & Volume) -->
+    <div class="pro-card-popup">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+         <span style="font-size: 11px; font-weight: 800; color: #666; text-transform: uppercase;">Velocity Lock</span>
+         <span id="speed-indicator" style="font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 800; color: #fff;">1.0x</span>
+      </div>
+      <input type="range" id="speed-slider" min="1" max="16" step="0.1" value="1" style="width: 100%; height: 6px; background: #222; border-radius: 3px; accent-color: #fff; cursor: pointer; margin-bottom: 24px;">
+      
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+         <span style="font-size: 11px; font-weight: 800; color: #666; text-transform: uppercase;">Audio Master</span>
+         <span id="volume-indicator" style="font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 800; color: #fff;">100%</span>
+      </div>
+      <input type="range" id="volume-slider" min="0" max="100" step="1" value="100" style="width: 100%; height: 6px; background: #222; border-radius: 3px; accent-color: #fff; cursor: pointer;">
+      
+      <div style="margin-top: 32px;">
+         <span style="font-size: 11px; font-weight: 800; color: #666; text-transform: uppercase; display: block; margin-bottom: 12px;">Intelligence Mode</span>
+         <select id="notesStyle" style="width: 100%; background: #000; border: 1px solid #222; border-radius: 12px; color: #fff; padding: 14px; font-size: 14px; font-weight: 700; outline: none; cursor: pointer;">
+            <option value="exam">🏛️ Universal Exam Mode</option>
+            <option value="general">🎙️ Podcast / General</option>
+            <option value="hacker">💻 Hacker Terminal Mode</option>
+         </select>
+      </div>
+    </div>
+
+    <div style="margin-top: 32px; text-align: center; display: flex; justify-content: center; gap: 20px;">
+       <button id="account-btn" style="background:none; border:none; color: #444; font-size: 10px; font-weight: 800; letter-spacing: 0.2em; cursor: pointer; transition: color 0.1s;">
+          ACCOUNT & PRO
+       </button>
+       <button id="settings-btn" style="background:none; border:none; color: #333; font-size: 10px; font-weight: 800; letter-spacing: 0.2em; cursor: pointer; transition: color 0.1s;">
+          CONFIGURATION SYSTEM
+       </button>
+    </div>
+
+    <div id="account-panel" style="display:none; margin-top: 20px; padding: 20px; background: #0a0a0a; border-radius: 20px; border: 1px solid #222; text-align: center;">
+        <div id="user-info" style="margin-bottom: 20px;">
+            <div style="font-size: 11px; font-weight: 800; color: #666; text-transform: uppercase; margin-bottom: 8px;">Current Plan</div>
+            <div id="plan-type" style="font-size: 18px; font-weight: 900; color: #fff;">FREE TIER</div>
+            <div id="usage-stats" style="font-size: 10px; color: #444; margin-top: 4px;">45 / 100 Transcription Minutes</div>
+        </div>
+        <button id="login-btn" class="btn-pill" style="width: 100%; padding: 14px; background: #111; margin-bottom: 12px;">LOGIN WITH GOOGLE</button>
+        <button id="upgrade-btn" class="btn-pill btn-pill-primary" style="width: 100%; padding: 14px; background: #fff; color: #000;">UPGRADE TO PRO</button>
+    </div>
+
+    <div id="settings-panel" style="display:none; margin-top: 20px; padding: 20px; background: #0a0a0a; border-radius: 20px; border: 1px solid #222;">
+        <div style="position: relative; margin-bottom: 12px;">
+            <input type="password" id="deepgram-key" placeholder="DEEPGRAM_API_KEY" style="width: 100%; background: #000; border: 1px solid #222; border-radius: 10px; color: #fff; padding: 12px; font-family: monospace;">
+            <span id="deepgram-key-status" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 8px; color: #10b981; font-weight: 800; opacity: 0; transition: opacity 0.3s;">SAVED</span>
+        </div>
+        <div style="position: relative; margin-bottom: 12px;">
+            <input type="password" id="groq-key" placeholder="GROQ_API_KEY" style="width: 100%; background: #000; border: 1px solid #222; border-radius: 10px; color: #fff; padding: 12px; font-family: monospace;">
+            <span id="groq-key-status" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 8px; color: #10b981; font-weight: 800; opacity: 0; transition: opacity 0.3s;">SAVED</span>
+        </div>
+        <div style="position: relative; margin-bottom: 20px;">
+            <input type="password" id="gemini-key" placeholder="GEMINI_API_KEY" style="width: 100%; background: #000; border: 1px solid #222; border-radius: 10px; color: #fff; padding: 12px; font-family: monospace;">
+            <span id="gemini-key-status" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 8px; color: #10b981; font-weight: 800; opacity: 0; transition: opacity 0.3s;">SAVED</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button id="save-settings" class="btn-pill" style="flex: 1; padding: 12px; font-size: 11px; background: #111;">SYNC KEY PROTOCOLS</button>
+            <button id="panic-btn" class="btn-pill" style="padding: 12px; font-size: 11px; background: #ef4444; color: white;">HARD RESET</button>
+        </div>
+    </div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

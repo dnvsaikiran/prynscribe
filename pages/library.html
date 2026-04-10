@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prysm - Library</title>
+    <link rel="stylesheet" href="../css/theme.css">
+    <style>
+        .search-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        .search-row input {
+            flex: 1;
+            min-width: 200px;
+        }
+        .lecture-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        .lecture-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            transition: transform 0.2s, border-color 0.2s;
+            position: relative;
+        }
+        .lecture-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent-color);
+        }
+        .status-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+        }
+        .status-badge.complete {
+            color: var(--success-color);
+            border-color: var(--success-color);
+        }
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .card-meta {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+        .card-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: auto;
+        }
+        .card-actions button {
+            flex: 1;
+            padding: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-container">
+        <div class="header-row">
+            <h1>Lecture Library</h1>
+            <button id="new-recording-btn" style="background: var(--accent-color);">New Recording</button>
+        </div>
+
+        <div class="search-row">
+            <input type="text" id="search-input" placeholder="Search by title or tags...">
+            <select id="filter-subject">
+                <option value="">All Subjects</option>
+                <option value="Polity">Polity</option>
+                <option value="Economy">Economy</option>
+                <option value="History">History</option>
+                <option value="Geography">Geography</option>
+            </select>
+            <select id="filter-mode">
+                <option value="">All Modes</option>
+                <option value="exam">Exam Mode</option>
+                <option value="general">General Mode</option>
+            </select>
+        </div>
+
+        <div id="no-lectures" style="display: none; text-align: center; margin-top: 4rem; color: var(--text-secondary);">
+            <p>No lectures found. Start by recording a lecture!</p>
+        </div>
+
+        <div id="library-grid" class="lecture-grid">
+            <!-- Lecture cards injected here -->
+        </div>
+    </div>
+
+    <script type="module" src="library.js"></script>
+</body>
+</html>
