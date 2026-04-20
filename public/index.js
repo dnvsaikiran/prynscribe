@@ -105,14 +105,40 @@ async function initAuth() {
     onboardingData.region = location.isIndia ? 'IN' : 'GLOBAL';
     updatePricingUI(onboardingData.region);
 
+    // Show auth section immediately so the page isn't blank while waiting
+    if (authLoading) authLoading.style.display = 'none';
+    if (authSection) authSection.style.display = 'block';
+
     supabase.auth.onAuthStateChange(async (event, session) => {
-        if (authLoading) authLoading.style.display = 'none';
         const user = session?.user;
         if (user) {
             authSection.style.display = 'none';
             userSection.style.display = 'flex';
-            
-            const { data: userSnap } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+
+            let { data: userSnap } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+
+            // First-time Google login — create the profile row
+            if (!userSnap) {
+                await supabase.from('profiles').insert({
+                    id: user.id,
+                    email: user.email,
+                    display_name: user.user_metadata?.full_name || user.email.split('@')[0],
+                    is_premium: false,
+                    tier: 'free',
+                    onboarding_complete: false,
+                    balance_seconds: 7200,
+                    recordings_count: 0,
+                    xp: 0,
+                    level: 1,
+                    streak_days: 0,
+                    selected_mode: 'auto',
+                    preferred_output_language: 'en',
+                    region: location.isIndia ? 'IN' : 'GLOBAL',
+                });
+                const { data: fresh } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+                userSnap = fresh;
+            }
+
             if (!userSnap || !userSnap.onboarding_complete) {
                 showOnboarding(location.countryCode);
             } else {
@@ -125,21 +151,19 @@ async function initAuth() {
                     examPath: data.exam_path,
                     goal: data.goal,
                     region: data.region,
-                    // Growth system
                     xp: data.xp || 0,
                     level: data.level || 1,
                     streak_days: data.streak_days || 0,
                     selected_mode: data.selected_mode || 'auto',
-                    // Language
                     preferred_output_language: data.preferred_output_language || 'en',
-                }, { displayName: data.display_name, email: user.email });
-                
+                }, { displayName: data.display_name || user.user_metadata?.full_name, email: user.email });
+
                 const jwt = session.access_token;
                 syncToExtension({
                     uid: user.id,
                     email: user.email,
                     idToken: jwt,
-                    displayName: data.display_name,
+                    displayName: data.display_name || user.user_metadata?.full_name,
                     isPremium: data.is_premium || false,
                     tier: data.tier || 'free',
                     goal: data.goal,
@@ -151,8 +175,8 @@ async function initAuth() {
                 });
             }
         } else {
-            authSection.style.display = 'block';
-            userSection.style.display = 'none';
+            if (authSection) authSection.style.display = 'block';
+            if (userSection) userSection.style.display = 'none';
             if (headerUserBadge) headerUserBadge.style.display = 'none';
         }
     });
@@ -427,10 +451,26 @@ payBtn.onclick = async () => {
     }
 };
 
-loginBtn.onclick = () => supabase.auth.signInWithOAuth({ provider: 'google' });
-logoutBtn.onclick = () => supabase.auth.signOut();
-changePathBtn.onclick = () => showOnboarding('IN');
-if (libraryBtn) libraryBtn.onclick = () => window.location.href = '/pages/library.html';
+if (loginBtn) {
+    loginBtn.onclick = async () => {
+        loginBtn.textContent = 'CONNECTING...';
+        loginBtn.disabled = true;
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin + window.location.pathname
+            }
+        });
+        if (error) {
+            console.error('[Auth] OAuth error:', error.message);
+            loginBtn.textContent = 'ACCESS COMMAND CENTER →';
+            loginBtn.disabled = false;
+        }
+    };
+}
+if (logoutBtn) logoutBtn.onclick = () => supabase.auth.signOut();
+if (changePathBtn) changePathBtn.onclick = () => showOnboarding('IN');
+if (libraryBtn) libraryBtn.onclick = () => window.location.href = 'pages/library.html';
 
 function updatePricingUI(region) {
     const pricing = getPricing(region);

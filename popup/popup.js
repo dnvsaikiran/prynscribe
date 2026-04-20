@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     restoreState();
     initLanguageIndicator();
+    initGreeting(); // Show name + emoji + motivational message
 });
 
 function initElements() {
@@ -315,9 +316,116 @@ function startTimer(startTime) {
         const mins = Math.floor(elapsed / 60000);
         const secs = Math.floor((elapsed % 60000) / 1000);
         if (timerDisplay) timerDisplay.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        // Update motivational message every 20 minutes
+        updateGreetingMessage(Math.floor(mins / 20));
     }, 1000);
 }
 
 function stopTimer() {
     if (timerInterval) clearInterval(timerInterval);
+}
+
+// ── GREETING SYSTEM ─────────────────────────────────────────────────────────
+const MOTIVATIONAL_MESSAGES = [
+    "Let's turn today's lecture into tomorrow's mastery. 🚀",
+    "Every word captured is a step closer to your goal.",
+    "Legends don't skip class. Let's record. ⚡",
+    "Your notes are now AI-powered. Let's go!",
+    "Intelligence captured = future you says thank you. 🙏",
+    "The best students don't just listen — they synthesize.",
+    "You showed up. That's already 50% of the battle. 🔥",
+    "Let's convert this session into pure gold.",
+    "Your future self is watching. Don't disappoint them.",
+    "Focus mode: ON. Distractions: terminated. 🎯",
+    "This lecture won't know what hit it.",
+    "Brains + AI = unstoppable. Let's do this.",
+    "Another session, another level unlocked. 🏆",
+    "Capture now, dominate the exam later.",
+    "The smartest people automate their notes. Look at you.",
+    "Recording in progress. Excellence in the making.",
+    "Every 20 minutes is a new block of knowledge.",
+    "You're building a second brain right now. 🧠",
+    "Deep work activated. Let's synthesize something great.",
+    "From lecture to legend — PrynScribe has you covered.",
+    "Consistency beats talent. Keep showing up. 🌟",
+    "This session will pay dividends for years.",
+    "Not just taking notes. Building a knowledge empire.",
+    "Your AI study partner is fully engaged. Stay focused!",
+    "Exam day will be easier because of right now.",
+    "You're one session closer to your breakthrough.",
+    "Audio in. Intelligence out. Let's capture it all.",
+    "The grind is real. So is the reward. 💎",
+    "Today's effort is tomorrow's confidence.",
+    "Synthesizing greatness, one chunk at a time.",
+    "Nobody remembers the person who didn't take notes.",
+    "Your lecture transcript is being created in real-time. 🌐",
+    "Stay present. The AI handles the rest.",
+    "Level up unlocked with every recording. Keep going!",
+    "This is what elite students do differently.",
+    "The compound effect of daily learning is insane. 📈",
+    "Recording → Transcript → Synthesis → Victory.",
+    "You're investing in your own intelligence. Smart move.",
+    "Knowledge doesn't expire. Capture it all.",
+    "This is your competitive edge right here. 🦅",
+    "Minds like yours don't rest — they optimize.",
+    "Each session makes the next exam less scary.",
+    "Clarity comes from capturing, not just listening.",
+    "Zero effort on notes. Maximum effort on understanding.",
+    "Let PrynScribe do the heavy lifting. You stay sharp.",
+    "This lecture is now permanently in your arsenal.",
+    "Making every minute count. That's the commander way.",
+    "You're not studying harder. You're studying smarter. 🧬",
+    "History is full of great listeners. Be one of them.",
+    "Session in progress. Excellence is loading... ⌛"
+];
+
+const GREETING_EMOJIS = ['👋','🤙','✌️','🫡','💪','🙌','🫶','⚡','🔥','🌟'];
+
+function getFirstName(displayName) {
+    if (!displayName) return 'Commander';
+    return displayName.split(' ')[0];
+}
+
+function updateGreetingMessage(cycleIndex = 0) {
+    const msgEl = document.getElementById('greeting-message');
+    if (!msgEl) return;
+    const idx = cycleIndex % MOTIVATIONAL_MESSAGES.length;
+    msgEl.textContent = `"${MOTIVATIONAL_MESSAGES[idx]}"`;
+    // Subtle fade animation
+    msgEl.style.opacity = '0';
+    setTimeout(() => { msgEl.style.opacity = '1'; msgEl.style.transition = 'opacity 0.6s ease'; }, 50);
+}
+
+function initGreeting() {
+    chrome.storage.local.get(['userProfile'], (state) => {
+        const profile = state.userProfile;
+        if (!profile) return;
+
+        const greetingBar = document.getElementById('user-greeting-bar');
+        const greetingName = document.getElementById('greeting-name');
+        const greetingEmoji = document.getElementById('greeting-emoji');
+        const greetingPlan = document.getElementById('greeting-plan');
+
+        if (!greetingBar) return;
+
+        // Show the bar
+        greetingBar.style.display = 'block';
+
+        // Set name
+        if (greetingName) greetingName.textContent = getFirstName(profile.displayName || profile.email);
+
+        // Random greeting emoji
+        if (greetingEmoji) greetingEmoji.textContent = GREETING_EMOJIS[Math.floor(Math.random() * GREETING_EMOJIS.length)];
+
+        // Plan badge
+        if (greetingPlan) {
+            const tier = profile.tier || (profile.isPremium ? 'PRO' : 'FREE');
+            greetingPlan.textContent = tier.toUpperCase();
+            greetingPlan.style.color = tier !== 'free' ? 'hsl(252,80%,75%)' : 'rgba(255,255,255,0.4)';
+        }
+
+        // Initial message (random from first 10 so it feels fresh each open)
+        const startIdx = Math.floor(Math.random() * 10);
+        updateGreetingMessage(startIdx);
+    });
 }
