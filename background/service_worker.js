@@ -461,7 +461,7 @@ async function startNeuralSynthesisEngine(lectureId) {
             console.log(`[Worker] Translating transcript from ${sourceLang} to ${outputLangCode}...`);
             try {
                 const keys = await chrome.storage.local.get(['groq_api_key']);
-                const groqKey = keys.groq_api_key || "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";
+                const groqKey = keys.groq_api_key || "";
                 fullTranscript = await translateTranscript(rawTranscript, sourceLang, outputLangCode, groqKey);
                 console.log(`[Worker] ✓ Translation complete. ${rawTranscript.length} chars → ${fullTranscript.length} chars`);
             } catch(e) {
