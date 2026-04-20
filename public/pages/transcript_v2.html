@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrynScribe — Intelligence Workspace</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: hsl(224,22%,4%);
+            --surface: hsl(224,18%,8%);
+            --raised: hsl(224,16%,12%);
+            --border: hsl(224,14%,17%);
+            --text: hsl(210,20%,96%);
+            --muted: hsl(215,14%,50%);
+        }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; }
+        #root { height: 100%; }
+
+        /* Flip Cards */
+        .flip-card { perspective: 1000px; width: 100%; height: 220px; cursor: pointer; }
+        .flip-card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.5s; transform-style: preserve-3d; }
+        .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+        .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; padding: 1.5rem; border-radius: 16px; text-align: center; }
+        .flip-card-front { background: var(--raised); border: 1px solid var(--border); color: var(--text); font-weight: 700; font-size: 14px; line-height: 1.5; }
+        .flip-card-back { background: linear-gradient(135deg, hsl(252,50%,15%), hsl(280,40%,12%)); border: 1px solid hsl(252,60%,35%); color: #fff; transform: rotateY(180deg); font-size: 13px; line-height: 1.6; }
+
+        /* MCQ */
+        .mcq-opt { width: 100%; text-align: left; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--raised); color: var(--text); font-size: 13px; cursor: pointer; transition: all 0.15s; margin-bottom: 8px; font-family: 'Outfit', sans-serif; }
+        .mcq-opt:hover:not(:disabled) { border-color: hsl(252,60%,50%); background: hsl(252,30%,12%); }
+        .mcq-opt.correct { border-color: #4ade80; background: hsl(142,40%,10%); color: #4ade80; }
+        .mcq-opt.wrong { border-color: #f87171; background: hsl(0,40%,10%); color: #f87171; }
+        .mcq-opt.dim { opacity: 0.35; }
+        .mcq-opt:disabled { cursor: default; }
+
+        /* Markdown */
+        .md h3 { font-size: 1.2rem; font-weight: 800; margin-top: 1.5rem; margin-bottom: 0.6rem; color: var(--text); }
+        .md h4 { font-size: 1rem; font-weight: 700; margin-top: 1.1rem; margin-bottom: 0.4rem; color: hsl(252,80%,75%); }
+        .md p { margin-bottom: 0.9rem; line-height: 1.75; color: hsl(215,15%,78%); }
+        .md ul { list-style-type: disc; padding-left: 1.4rem; margin-bottom: 0.9rem; }
+        .md li { margin-bottom: 0.4rem; color: hsl(215,15%,75%); line-height: 1.6; }
+        .md strong { font-weight: 800; color: var(--text); }
+
+        /* Sidebar */
+        .sidebar-btn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border-radius: 10px; border: none; background: none; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s; font-family: 'Outfit', sans-serif; text-align: left; }
+        .sidebar-btn:hover { background: var(--raised); color: var(--text); }
+        .sidebar-btn.active { background: hsl(252,40%,14%); color: hsl(252,90%,75%); border: 1px solid hsl(252,40%,25%); }
+
+        /* Cornell Notes */
+        .cornell-grid { display: grid; grid-template-columns: 200px 1fr; grid-template-rows: auto auto; gap: 1px; background: var(--border); border-radius: 12px; overflow: hidden; }
+        .cornell-cues { background: hsl(252,20%,10%); padding: 16px; border-right: 1px solid var(--border); }
+        .cornell-notes { background: var(--raised); padding: 16px; }
+        .cornell-summary { grid-column: 1/-1; background: hsl(210,20%,8%); padding: 14px; border-top: 1px solid var(--border); }
+
+        /* Action Item */
+        .action-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; background: var(--raised); border-radius: 10px; border: 1px solid var(--border); margin-bottom: 8px; }
+        .priority-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+        .priority-high { background: #f87171; }
+        .priority-medium { background: #fbbf24; }
+        .priority-low { background: #4ade80; }
+
+        /* Memory Ladder */
+        .ladder-step { display: flex; align-items: flex-start; gap: 12px; padding: 12px; }
+        .ladder-line { display: flex; flex-direction: column; align-items: center; }
+        .ladder-dot { width: 32px; height: 32px; border-radius: 50%; background: hsl(252,60%,40%); border: 2px solid hsl(252,90%,68%); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: #fff; flex-shrink: 0; }
+        .ladder-connector { width: 2px; background: var(--border); flex: 1; min-height: 20px; }
+
+        /* Chat */
+        .chat-msg { padding: 10px 14px; border-radius: 12px; font-size: 12px; line-height: 1.6; max-width: 90%; }
+        .chat-msg.user { background: hsl(252,50%,20%); color: #fff; border-radius: 12px 12px 2px 12px; margin-left: auto; }
+        .chat-msg.bot { background: var(--raised); border: 1px solid var(--border); color: hsl(215,15%,80%); border-radius: 12px 12px 12px 2px; }
+
+        /* Mode Badge */
+        .mode-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 99px; font-size: 10px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; border: 1px solid; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+        /* Animations */
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeInUp 0.3s ease forwards; }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="module">
+    import { getLecture, getFullTranscript } from '../lib/db.js';
+    import { askLectureBot } from '../lib/ai_service.js';
+    window._ps = {
+        getLectureData: async (id) => {
+            const lecture = await getLecture(id);
+            const transcript = await getFullTranscript(id);
+            // Pull mode-specific rich data from artifact_data if available
+            const artifact = lecture?.artifact_data || lecture || {};
+            return { ...lecture, ...artifact, artifact_data: artifact, fullTranscript: transcript || "" };
+        },
+        askAI: askLectureBot
+    };
+</script>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel" data-type="module">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── CONSTANTS ──────────────────────────────────────────────────────────────
+const MODE_META = {
+    exam:            { label: "Exam Mode",        emoji: "🏆", color: "hsl(252,90%,68%)" },
+    summary:         { label: "Summary Mode",     emoji: "⚡", color: "hsl(210,90%,68%)" },
+    podcast:         { label: "Podcast Mode",     emoji: "🎙️", color: "hsl(30,90%,65%)" },
+    memory:          { label: "Memory Mode",      emoji: "🧠", color: "hsl(170,80%,55%)" },
+    problem_solving: { label: "Problem Solving",  emoji: "🔬", color: "hsl(190,90%,60%)" },
+    interview:       { label: "Interview Mode",   emoji: "💼", color: "hsl(45,100%,60%)" },
+    notes:           { label: "Notes Mode",       emoji: "📋", color: "hsl(280,70%,65%)" },
+    productivity:    { label: "Productivity",     emoji: "🚀", color: "hsl(350,80%,65%)" },
+    research:        { label: "Research Mode",    emoji: "🔭", color: "hsl(155,75%,55%)" },
+    auto:            { label: "Auto Mode",        emoji: "✨", color: "hsl(320,85%,70%)" },
+};
+
+const MODE_TABS = {
+    exam:            [["📝","Summary Sheet"],["🧐","15 MCQs"],["🃏","Flashcards"],["⚖️","Concept Analysis"],["📖","Glossary"],["🎯","Exam Targets"],["📜","Transcript"]],
+    summary:         [["⚡","Rapid Summary"],["•","Key Points"],["🔍","Blind Spots"],["💎","High Yield"],["📜","Transcript"]],
+    podcast:         [["🎙️","Narrative Script"],["🎣","Hook & Takeaway"],["📜","Transcript"]],
+    memory:          [["🧠","Mnemonics"],["🃏","Spaced Repetition"],["🪜","Memory Ladder"],["📅","Recall Plan"],["📜","Transcript"]],
+    problem_solving: [["🔢","Formulas"],["📐","Step-by-Step"],["✏️","Worked Examples"],["⚠️","Common Mistakes"],["⚡","Shortcuts"],["📜","Transcript"]],
+    interview:       [["💼","Technical Q&A"],["🤝","HR Behavioral"],["💬","Communication"],["💪","Confidence"],["📜","Transcript"]],
+    notes:           [["📋","Cornell Notes"],["🏗️","Structure"],["🗒️","One-Pager"],["📜","Transcript"]],
+    productivity:    [["✅","Action Items"],["🎯","Decisions"],["⏰","Deadlines"],["📊","Exec Summary"],["📜","Transcript"]],
+    research:        [["🔭","Core Arguments"],["⚖️","Counterpoints"],["🧬","Frameworks"],["💡","Insights"],["🗺️","Research Paths"],["📜","Transcript"]],
+    auto:            [["📝","Summary Sheet"],["📜","Transcript"]],
+};
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+const fmt = (text) => {
+    if (!text) return "";
+    return text
+        .replace(/^### (.*)/gm,'<h3>$1</h3>')
+        .replace(/^## (.*)/gm,'<h3>$1</h3>')
+        .replace(/^# (.*)/gm,'<h3>$1</h3>')
+        .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+        .replace(/\n\n/g,'</p><p>')
+        .replace(/^(?!<[hpul])(.*)/gm,(m) => m ? `<p>${m}</p>` : '');
+};
+
+const Section = ({title, accent, children}) => (
+    <div className="fade-in" style={{marginBottom:'32px'}}>
+        {title && <h2 style={{fontSize:'11px',fontWeight:900,letterSpacing:'0.2em',textTransform:'uppercase',color:'var(--muted)',marginBottom:'16px',display:'flex',alignItems:'center',gap:'8px'}}>
+            <span style={{width:'3px',height:'14px',borderRadius:'2px',background:accent||'hsl(252,90%,68%)',display:'inline-block'}}/>
+            {title}
+        </h2>}
+        {children}
+    </div>
+);
+
+const Card = ({children, style={}}) => (
+    <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'14px',padding:'20px',...style}}>
+        {children}
+    </div>
+);
+
+// ── MCQ COMPONENT ──────────────────────────────────────────────────────────
+const MCQ = ({mcq, index}) => {
+    const [sel, setSel] = useState(null);
+    const ai = mcq.answerIndex ?? mcq.correct_index ?? 0;
+    return (
+        <Card style={{marginBottom:'12px'}}>
+            <p style={{fontWeight:700,marginBottom:'14px',fontSize:'14px',color:'var(--text)'}}>
+                <span style={{color:'hsl(252,70%,70%)',marginRight:'8px',fontFamily:'JetBrains Mono'}}>{index+1}.</span>
+                {mcq.question}
+            </p>
+            {(mcq.options||[]).map((opt,i) => {
+                let cls = 'mcq-opt';
+                if (sel!==null) {
+                    if (i===ai) cls+=' correct';
+                    else if (i===sel) cls+=' wrong';
+                    else cls+=' dim';
+                }
+                return <button key={i} className={cls} disabled={sel!==null} onClick={()=>setSel(i)}>{String.fromCharCode(65+i)}. {opt}</button>;
+            })}
+            {sel!==null && mcq.explanation && (
+                <div style={{marginTop:'10px',padding:'10px 12px',background:'hsl(252,30%,10%)',borderRadius:'8px',fontSize:'12px',color:'hsl(252,70%,75%)',borderLeft:'3px solid hsl(252,90%,68%)'}}>
+                    💡 {mcq.explanation}
+                </div>
+            )}
+        </Card>
+    );
+};
+
+// ── FLASHCARD ──────────────────────────────────────────────────────────────
+const Flashcard = ({card, accent}) => {
+    const [flipped, setFlipped] = useState(false);
+    return (
+        <div className={`flip-card ${flipped?'flipped':''}`} onClick={()=>setFlipped(f=>!f)}>
+            <div className="flip-card-inner">
+                <div className="flip-card-front">
+                    <div>
+                        <div style={{fontSize:'10px',fontWeight:900,letterSpacing:'0.15em',color:'var(--muted)',marginBottom:'10px',textTransform:'uppercase'}}>QUESTION — TAP TO REVEAL</div>
+                        <div style={{fontSize:'14px',lineHeight:1.6}}>{card.question || card.card}</div>
+                    </div>
+                </div>
+                <div className="flip-card-back">
+                    <div>
+                        <div style={{fontSize:'10px',fontWeight:900,letterSpacing:'0.15em',color:accent||'hsl(252,70%,75%)',marginBottom:'10px',textTransform:'uppercase'}}>ANSWER</div>
+                        <div style={{fontSize:'13px',lineHeight:1.6}}>{card.answer}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ── MODE-SPECIFIC RENDERERS ────────────────────────────────────────────────
+const ExamView = ({data, accent}) => {
+    const tab = data._activeTab;
+    if (tab==='📝Summary Sheet') return (
+        <Section title="Master Summary Sheet" accent={accent}>
+            <Card><div className="md" dangerouslySetInnerHTML={{__html:fmt(data.master_summary_sheet||data.summary_sheet||data.summary)}}/></Card>
+        </Section>
+    );
+    if (tab==='🧐15 MCQs') return (
+        <Section title="Neural Evaluation — 15 MCQs" accent={accent}>
+            {(data.mcqs||[]).length ? data.mcqs.map((q,i)=><MCQ key={i} mcq={q} index={i}/>) : <Card><p style={{color:'var(--muted)',fontSize:'13px'}}>MCQs not generated for this session.</p></Card>}
+        </Section>
+    );
+    if (tab==='🃏Flashcards') return (
+        <Section title="Active Recall Deck" accent={accent}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:'16px'}}>
+                {(data.flashcards||[]).length ? data.flashcards.map((c,i)=><Flashcard key={i} card={c} accent={accent}/>) : <p style={{color:'var(--muted)',fontSize:'13px'}}>Flashcards not generated.</p>}
+            </div>
+        </Section>
+    );
+    if (tab==='⚖️Concept Analysis') return (
+        <Section title="Deep Concept Analysis" accent={accent}>
+            <Card><div className="md" dangerouslySetInnerHTML={{__html:fmt(data.concept_analysis||data.analysis)}}/></Card>
+        </Section>
+    );
+    if (tab==='📖Glossary') return (
+        <Section title="Smart Glossary" accent={accent}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:'10px'}}>
+                {(data.glossary||[]).map((g,i)=>(
+                    <Card key={i} style={{borderLeft:`3px solid ${accent}`}}>
+                        <div style={{fontWeight:900,fontSize:'13px',marginBottom:'6px'}}>{g.term}</div>
+                        <div style={{fontSize:'12px',color:'var(--muted)',lineHeight:1.6}}>{g.definition}</div>
+                    </Card>
+                ))}
+            </div>
+        </Section>
+    );
+    if (tab==='🎯Exam Targets') return (
+        <Section title="Exam Criticality Map" accent={accent}>
+            {(data.exam_criticality||data.revision_notes||[]).map((item,i)=>(
+                <div key={i} style={{display:'flex',gap:'12px',alignItems:'flex-start',marginBottom:'10px',padding:'12px 14px',background:'var(--raised)',borderRadius:'10px',border:'1px solid var(--border)'}}>
+                    <span style={{fontFamily:'JetBrains Mono',fontSize:'11px',color:accent,fontWeight:700,flexShrink:0,marginTop:'2px'}}>#{i+1}</span>
+                    <span style={{fontSize:'13px',lineHeight:1.6}}>{item}</span>
+                </div>
+            ))}
+        </Section>
+    );
+    return null;
+};
+
+const SummaryView = ({data, accent}) => {
+    const tab = data._activeTab;
+    if (tab==='⚡Rapid Summary') return (
+        <Section title="Rapid Insight Summary" accent={accent}>
+            <Card style={{borderLeft:`3px solid ${accent}`,marginBottom:'16px'}}>
+                <p style={{fontSize:'15px',lineHeight:1.8,color:'hsl(215,15%,82%)'}}>{data.rapid_summary||data.summary}</p>
+            </Card>
+            {data.quick_revision && (
+                <div style={{padding:'16px',background:'hsl(210,30%,8%)',borderRadius:'12px',border:`1px solid hsl(210,40%,20%)`,marginTop:'8px'}}>
+                    <div style={{fontSize:'9px',fontWeight:900,letterSpacing:'0.2em',color:'hsl(210,70%,60%)',marginBottom:'8px'}}>⏱ 60 SEC REVISION</div>
+                    <p style={{fontSize:'13px',lineHeight:1.7,color:'hsl(210,20%,80%)'}}>{data.quick_revision}</p>
+                </div>
+            )}
+        </Section>
+    );
+    if (tab==='•Key Points') return (
+        <Section title="Key Points" accent={accent}>
+            {(data.key_points||[]).map((p,i)=>(
+                <div key={i} style={{display:'flex',gap:'12px',marginBottom:'10px',padding:'12px 14px',background:'var(--raised)',borderRadius:'10px',border:'1px solid var(--border)',alignItems:'flex-start'}}>
+                    <span style={{color:accent,fontSize:'12px',fontWeight:900,flexShrink:0,marginTop:'2px'}}>→</span>
+                    <span style={{fontSize:'13px',lineHeight:1.6}}>{p}</span>
+                </div>
+            ))}
+        </Section>
+    );
+    if (tab==='🔍Blind Spots') return (
+        <Section title="3 Blind Spots You Should Know" accent={accent}>
+            {(data.blind_spots||[]).map((b,i)=>(
+                <Card key={i} style={{marginBottom:'10px',borderLeft:`3px solid hsl(30,90%,60%)`}}>
+                    <div style={{fontSize:'9px',fontWeight:900,color:'hsl(30,90%,60%)',letterSpacing:'0.15em',marginBottom:'6px'}}>BLIND SPOT #{i+1}</div>
+                    <p style={{fontSize:'13px',lineHeight:1.6,color:'var(--text)'}}>{b}</p>
+                </Card>
+            ))}
+        </Section>
+    );
+    if (tab==='💎High Yield') return (
+        <Section title="High-Yield Facts" accent={accent}>
+            {(data.high_yield_facts||[]).map((f,i)=>(
+                <div key={i} style={{display:'flex',gap:'12px',marginBottom:'8px',padding:'10px 14px',background:'hsl(210,30%,8%)',borderRadius:'10px',alignItems:'center'}}>
+                    <span style={{fontSize:'16px'}}>💎</span>
+                    <span style={{fontSize:'13px',fontWeight:600}}>{f}</span>
+                </div>
+            ))}
+        </Section>
+    );
+    return null;
+};
+
+const PodcastView = ({data, accent}) => {
+    const tab = data._activeTab;
+    if (tab==='🎙️Narrative Script') return (
+        <Section title="Narrative Script" accent={accent}>
+            {data.hook && (
+                <Card style={{marginBottom:'16px',background:'hsl(30,20%,8%)',border:`1px solid hsl(30,50%,25%)`}}>
+                    <div style={{fontSize:'9px',fontWeight:900,color:'hsl(30,90%,65%)',letterSpacing:'0.2em',marginBottom:'8px'}}>🎣 HOOK</div>
+                    <p style={{fontSize:'15px',fontStyle:'italic',color:'hsl(30,30%,85%)',lineHeight:1.7}}>{data.hook}</p>
+                </Card>
+            )}
+            <Card>
+                <div className="md" dangerouslySetInnerHTML={{__html:fmt(data.narrative_script||data.summary_sheet||data.summary)}}/>
+            </Card>
+        </Section>
+    );
+    if (tab==='🎣Hook & Takeaway') return (
+        <Section title="Key Moments" accent={accent}>
+            <Card style={{marginBottom:'16px',borderLeft:`3px solid hsl(30,90%,65%)`}}>
+                <div style={{fontSize:'10px',fontWeight:900,color:'hsl(30,90%,65%)',marginBottom:'8px',letterSpacing:'0.15em'}}>🎣 HOOK — OPENING STATEMENT</div>
+                <p style={{fontSize:'14px',lineHeight:1.7,fontStyle:'italic'}}>{data.hook||"—"}</p>
+            </Card>
+            <Card style={{borderLeft:`3px solid ${accent}`}}>
+                <div style={{fontSize:'10px',fontWeight:900,color:accent,marginBottom:'8px',letterSpacing:'0.15em'}}>✨ KEY TAKEAWAY</div>
+                <p style={{fontSize:'14px',lineHeight:1.7}}>{data.key_takeaway||"—"}</p>
+            </Card>
+        </Section>
+    );
+    return null;
+};
+
+const MemoryView = ({data, accent}) => {
+    const tab = data._activeTab;
+    if (tab==='🧠Mnemonics') return (
+        <Section title="Mnemonic Devices" accent={accent}>
+            {(data.mnemonics||[]).map((m,i)=>(
+                <Card key={i} style={{marginBottom:'10px'}}>
+                    <div style={{fontWeight:900,fontSize:'12px',color:'var(--muted)',marginBottom:'4px'}}>{m.concept}</div>
+                    <div style={{fontSize:'18px',fontWeight:900,color:accent,marginBottom:'6px',letterSpacing:'0.05em'}}>"{m.mnemonic}"</div>
+                    <p style={{fontSize:'12px',color:'hsl(215,15%,70%)',lineHeight:1.6}}>{m.explanation}</p>
+                </Card>
+            ))}
+        </Section>
+    );
+    if (tab==='🃏Spaced Repetition') return (
+        <Section title="Spaced Repetition Cards" accent={accent}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:'16px'}}>
+                {(data.spaced_repetition||data.flashcards||[]).map((c,i)=>(
+                    <div key={i}>
+                        <Flashcard card={c} accent={accent}/>
+                        {c.difficulty && <div style={{textAlign:'center',marginTop:'6px',fontSize:'9px',fontWeight:900,color:c.difficulty==='easy'?'#4ade80':c.difficulty==='hard'?'#f87171':'#fbbf24',letterSpacing:'0.15em'}}>{c.difficulty.toUpperCase()}</div>}
+                    </div>
+                ))}
+            </div>
+        </Section>
+    );
+    if (tab==='🪜Memory Ladder') return (
+        <Section title="Concept Ladder — Simple to Complex" accent={accent}>
+            <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'14px',padding:'16px'}}>
+                {(data.memory_ladder||[]).map((step,i,arr)=>(
+                    <div key={i} className="ladder-step">
+                        <div className="ladder-line">
+                            <div className="ladder-dot">{i+1}</div>
+                            {i<arr.length-1 && <div className="ladder-connector"/>}
+                        </div>
+                        <p style={{fontSize:'13px',lineHeight:1.6,paddingTop:'6px',flexShrink:1}}>{step}</p>
+                    </div>
+                ))}
+            </div>
+        </Section>
+    );
+    if (tab==='📅Recall Plan') return (
+        <Section title="Spaced Recall Schedule" accent={accent}>
+            {data.recall_plan && Object.entries(data.recall_plan).map(([when,what])=>(
+                <Card key={when} style={{marginBottom:'10px',display:'flex',gap:'16px',alignItems:'flex-start'}}>
+                    <div style={{background:'hsl(252,40%,15%)',borderRadius:'8px',padding:'8px 12px',flexShrink:0,textAlign:'center',minWidth:'60px'}}>
+                        <div style={{fontSize:'11px',fontWeight:900,color:accent}}>{when.replace('_',' ')}</div>
+                    </div>
+                    <p style={{fontSize:'13px',lineHeight:1.6,marginTop:'4px'}}>{what}</p>
+                </Card>
+            ))}
+            {data.priority_facts && (
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',marginTop:'20px'}}>
+                    <div style={{background:'hsl(252,25%,10%)',borderRadius:'12px',padding:'14px',border:`1px solid hsl(252,40%,20%)`}}>
+                        <div style={{fontSize:'9px',fontWeight:900,color:accent,letterSpacing:'0.15em',marginBottom:'10px'}}>🔴 MUST REMEMBER</div>
+                        {(data.priority_facts.core||[]).map((f,i)=><div key={i} style={{fontSize:'12px',marginBottom:'6px',lineHeight:1.5}}>• {f}</div>)}
+                    </div>
+                    <div style={{background:'var(--raised)',borderRadius:'12px',padding:'14px',border:'1px solid var(--border)'}}>
+                        <div style={{fontSize:'9px',fontWeight:900,color:'var(--muted)',letterSpacing:'0.15em',marginBottom:'10px'}}>🟡 PERIPHERAL</div>
+                        {(data.priority_facts.peripheral||[]).map((f,i)=><div key={i} style={{fontSize:'12px',marginBottom:'6px',lineHeight:1.5,color:'var(--muted)'}}>• {f}</div>)}
+                    </div>
+                </div>
+            )}
+        </Section>
+    );
+    return null;
+};
+
+const ProblemView = ({data, accent}) => {
+    const tab = data._activeTab;
+    if (tab==='🔢Formulas') return (
+        <Section title="Formula Library" accent={accent}>
+            {(data.formulas||[]).map((f,i)=>(
+                <Card key={i} style={{marginBottom:'10px',borderLeft:`3px solid ${accent}`}}>
+                    <div style={{fontFamily:'JetBrains Mono',fontSize:'15px',fontWeight:700,color:accent,marginBottom:'6px'}}>{f.formula}</div>
+                    <div style={{fontSize:'12px',fontWeight:700,marginBottom:'4px'}}>{f.meaning}</div>
+                    <div style={{fontSize:'11px',color:'var(--muted)'}}>When to use: {f.when_to_use}</div>
+                </Card>
+            ))}
+        </Section>
+    );
+    if (tab==='📐Step-by-Step') return (
+        <Section title="Step-by-Step Method" accent={accent}>
+            {(data.step_by_step||[]).map((s,i)=>(
+                <div key={i} style={{display:'flex',gap:'16px',marginBottom:'12px'}}>
+                    <div style={{width:'32px',height:'32px',borderRadius:'8px',background:`linear-gradient(135deg, ${accent}, hsl(252,60%,40%))`,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:'13px',color:'#fff',flexShrink:0}}>{s.step||i+1}</div>
+                    <div style={{flex:1,paddingTop:'4px'}}>
+                        <div style={{fontWeight:700,fontSize:'13px',marginBottom:'4px'}}>{s.action}</div>
+                        {s.why && <div style={{fontSize:'11px',color:'var(--muted)',lineHeight:1.5}}>Why: {s.why}</div>}
+                    </div>
+                </div>
+            ))}
+        </Section>
+    );
+    if (tab==='✏️Worked Examples') return (
+        <Section title="Worked Examples" accent={accent}>
+            {(data.worked_examples||[]).map((ex,i)=>(
+                <Card key={i} style={{marginBottom:'12px'}}>
+                    <div style={{fontSize:'9px',fontWeight:900,color:accent,letterSpacing:'0.15em',marginBottom:'10px'}}>EXAMPLE {i+1}</div>
+                    <div style={{fontWeight:700,marginBottom:'8px',fontSize:'13px'}}>📌 Problem: {ex.problem}</div>
+                    <div style={{background:'hsl(190,20%,8%)',borderRadius:'8px',padding:'12px',fontSize:'12px',lineHeight:1.7,color:'hsl(190,30%,80%)',fontFamily:'JetBrains Mono'}}>
+                        {ex.solution}
+                    </div>
+                </Card>
+            ))}
+        </Section>
+    );
+    if (tab==='⚠️Common Mistakes') return (
+        <Section title="Common Mistakes to Avoid" accent={accent}>
+            {(data.common_mistakes||[]).map((m,i)=>(
+                <div key={i} style={{display:'flex',gap:'12px',padding:'12px 14px',background:'hsl(0,30%,8%)',borderRadius:'10px',border:'1px solid hsl(0,40%,20%)',marginBottom:'8px',alignItems:'flex-start'}}>
+                    <span style={{fontSize:'16px',flexShrink:0}}>⚠️</span>
+                    <span style={{fontSize:'13px',lineHeight:1.6}}>{m}</span>
+                </div>
+            ))}
+            {(data.shortcuts||[]).length>0 && (
+                <Section title="Fast Tricks & Shortcuts" accent={accent}>
+                    {data.shortcuts.map((s,i)=>(
+                        <div key={i} style={{display:'flex',gap:'12px',padding:'10px 14px',background:'hsl(190,20%,8%)',borderRadius:'10px',border:`1px solid hsl(190,40%,18%)`,marginBottom:'8px',alignItems:'flex-start'}}>
+                            <span style={{color:accent,fontWeight:900,flexShrink:0}}>⚡</span>
+                            <span style={{fontSize:'13px',lineHeight:1.6}}>{s}</span>
+                        </div>
+                    ))}
+                </Section>
+            )}
+        </Section>
+    );
+    if (tab==='⚡Shortcuts') return (
+        <Section title="Tricks & Practice Set" accent={accent}>
+            {(data.shortcuts||[]).map((s,i)=>(
+                <div key={i} style={{display:'flex',gap:'12px',padding:'10px 14px',background:'hsl(190,20%,8%)',borderRadius:'10px',border:`1px solid hsl(190,40%,18%)`,marginBottom:'8px'}}>
+                    <span style={{color:accent,fontWeight:900}}>⚡</span>
+                    <span style={{fontSize:'13px',lineHeight:1.6}}>{s}</span>
+                </div>
+            ))}
+            <div style={{marginTop:'20px'}}/>
+            {(data.practice_set||[]).map((q,i)=><MCQ key={i} mcq={{question:q.question,options:[q.answer,'Incorrect option','Another wrong one','None of the above'],answerIndex:0,explanation:q.answer}} index={i}/>)}
+        </Section>
+    );
+    return null;
+};
+
+const InterviewView = ({data, accent}) => {
+    const tab = data._activeTab;
+    if (tab==='💼Technical Q&A') return (
+        <Section title="Technical Interview Questions" accent={accent}>
+            {(data.technical_questions||[]).map((q,i)=>(
+                <Card key={i} style={{marginBottom:'12px'}}>
+                    <div style={{fontWeight:800,fontSize:'13px',marginBottom:'10px',color:'var(--text)'}}>Q{i+1}: {q.question}</div>
+                    <div style={{background:'hsl(252,20%,10%)',borderRadius:'8px',padding:'12px',fontSize:'12px',lineHeight:1.7,color:'hsl(252,20%,75%)',borderLeft:`2px solid ${accent}`}}>
+                        {q.model_answer}
+                    </div>
+                </Card>
+            ))}
+        </Section>
+    );
+    if (tab==='🤝HR Behavioral') return (
+        <Section title="HR Behavioral (STAR Method)" accent={accent}>
+            {(data.hr_behavioral||[]).map((q,i)=>(
+                <Card key={i} style={{marginBottom:'12px'}}>
+                    <div style={{fontWeight:800,fontSize:'13px',marginBottom:'12px'}}>"{q.question}"</div>
+                    {q.star_answer && (
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+                            {Object.entries(q.star_answer).map(([k,v])=>(
+                                <div key={k} style={{background:'var(--raised)',borderRadius:'8px',padding:'10px'}}>
+                                    <div style={{fontSize:'9px',fontWeight:900,color:accent,letterSpacing:'0.15em',marginBottom:'4px'}}>{k.toUpperCase()}</div>
+                                    <div style={{fontSize:'12px',lineHeight:1.5,color:'hsl(215,15%,75%)'}}>{v}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </Card>
+            ))}
+        </Section>
+    );
+    if (tab==='💬Communication') return (
+        <Section title="Communication Tips" accent={accent}>
+            {(data.communication_tips||[]).map((t,i)=>(
+                <div key={i} style={{display:'flex',gap:'12px',padding:'12px 14px',background:'var(--raised)',borderRadius:'10px',border:'1px solid var(--border)',marginBottom:'8px'}}>
+                    <span style={{color:accent,fontWeight:900,flexShrink:0}}>→</span>
+                    <span style={{fontSize:'13px',lineHeight:1.6}}>{t}</span>
+                </div>
+            ))}
+            {(data.vocabulary_upgrade||[]).length>0 && (
+                <div style={{marginTop:'20px'}}>
+                    <div style={{fontSize:'10px',fontWeight:900,color:'var(--muted)',letterSpacing:'0.15em',marginBottom:'12px'}}>📚 VOCABULARY UPGRADE</div>
+                    {data.vocabulary_upgrade.map((v,i)=>(
+                        <div key={i} style={{display:'flex',gap:'12px',padding:'10px 14px',background:'var(--raised)',borderRadius:'10px',marginBottom:'6px',alignItems:'center'}}>
+                            <span style={{fontSize:'12px',color:'#f87171',textDecoration:'line-through',minWidth:'100px'}}>{v.old_phrase}</span>
+                            <span style={{color:'var(--muted)'}}>→</span>
+                            <span style={{fontSize:'12px',color:'#4ade80',fontWeight:700}}>{v.elite_phrase}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </Section>
+    );
+    if (tab==='💪Confidence') return (
+        <Section title="Confidence Boosters" accent={accent}>
+            {(data.confidence_boosters||[]).map((b,i)=>(
+                <div key={i} style={{padding:'16px',background:`linear-gradient(135deg, hsl(45,40%,8%), var(--surface))`,borderRadius:'12px',border:`1px solid hsl(45,40%,20%)`,marginBottom:'10px'}}>
+                    <span style={{fontSize:'18px',marginRight:'10px'}}>⭐</span>
+                    <span style={{fontSize:'13px',lineHeight:1.6,fontWeight:600}}>{b}</span>
+                </div>
+            ))}
+        </Section>
+    );
+    return null;
+};
+
+const NotesView = ({data, accent}) => {
+    const tab = data._activeTab;
+    if (tab==='📋Cornell Notes') return (
+        <Section title="Cornell Notes" accent={accent}>
+            {data.cornell_notes ? (
+                <div className="cornell-grid">
+                    <div className="cornell-cues">
+                        <div style={{fontSize:'9px',fontWeight:900,color:accent,letterSpacing:'0.15em',marginBottom:'10px'}}>CUE COLUMN</div>
+                        {(data.cornell_notes.cues||[]).map((c,i)=>(
+                            <div key={i} style={{fontSize:'12px',marginBottom:'8px',color:'hsl(215,15%,75%)',lineHeight:1.5}}>• {c}</div>
+                        ))}
+                    </div>
+                    <div className="cornell-notes">
+                        <div style={{fontSize:'9px',fontWeight:900,color:'var(--muted)',letterSpacing:'0.15em',marginBottom:'10px'}}>NOTES</div>
+                        <div className="md" style={{fontSize:'12px'}} dangerouslySetInnerHTML={{__html:fmt(data.cornell_notes.notes||'')}}/>
+                    </div>
+                    <div className="cornell-summary">
+                        <div style={{fontSize:'9px',fontWeight:900,color:'var(--muted)',letterSpacing:'0.15em',marginBottom:'8px'}}>SUMMARY</div>
+                        <p style={{fontSize:'12px',lineHeight:1.7,color:'hsl(215,15%,75%)'}}>{data.cornell_notes.summary_block||''}</p>
+                    </div>
+                </div>
+            ) : <Card><div className="md" dangerouslySetInnerHTML={{__html:fmt(data.summary_sheet||data.summary)}}/></Card>}
+        </Section>
+    );
+    if (tab==='🏗️Structure') return (
+        <Section title="Heading Structure" accent={accent}>
+            {(data.heading_structure||[]).map((h,i)=>(
+                <Card key={i} style={{marginBottom:'12px'}}>
+                    <div style={{fontWeight:900,fontSize:'15px',marginBottom:'8px',color:accent}}>{h.heading}</div>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'8px'}}>
+                        {(h.subheadings||[]).map((s,j)=><span key={j} style={{fontSize:'11px',padding:'3px 10px',background:'var(--raised)',borderRadius:'99px',color:'var(--muted)'}}>{s}</span>)}
+                    </div>
+                    <p style={{fontSize:'12px',lineHeight:1.6,color:'hsl(215,15%,70%)'}}>{h.content}</p>
+                </Card>
+            ))}
+        </Section>
+    );
+    if (tab==='🗒️One-Pager') return (
+        <Section title="Printable One-Pager" accent={accent}>
+            <Card style={{fontFamily:'JetBrains Mono',fontSize:'12px',lineHeight:1.9,color:'hsl(215,15%,78%)',whiteSpace:'pre-wrap'}}>
+                {data.printable_one_pager||data.summary_sheet||data.summary}
+            </Card>
+        </Section>
+    );
+    return null;
+};
+
+const ProductivityView = ({data, accent}) => {
+    const tab = data._activeTab;
+    if (tab==='✅Action Items') return (
+        <Section title="Action Items" accent={accent}>
+            {(data.action_items||[]).map((a,i)=>(
+                <div key={i} className="action-item">
+                    <div className={`priority-dot priority-${(a.priority||'medium').toLowerCase()}`}/>
+                    <div style={{flex:1}}>
+                        <div style={{fontSize:'13px',fontWeight:700,marginBottom:'2px'}}>{a.task}</div>
+                        {a.owner && <div style={{fontSize:'11px',color:'var(--muted)'}}>Owner: {a.owner} · Priority: {a.priority}</div>}
+                    </div>
+                </div>
+            ))}
+        </Section>
+    );
+    if (tab==='🎯Decisions') return (
+        <Section title="Decisions Made" accent={accent}>
+            {(data.decisions_made||[]).map((d,i)=>(
+                <div key={i} style={{display:'flex',gap:'12px',padding:'12px 14px',background:`hsl(352,30%,10%)`,borderRadius:'10px',border:`1px solid hsl(352,40%,22%)`,marginBottom:'8px'}}>
+                    <span style={{color:'#f87171',fontWeight:900,flexShrink:0}}>✓</span>
+                    <span style={{fontSize:'13px',lineHeight:1.6}}>{d}</span>
+                </div>
+            ))}
+        </Section>
+    );
+    if (tab==='⏰Deadlines') return (
+        <Section title="Deadlines & Key Dates" accent={accent}>
+            {(data.deadlines||[]).map((d,i)=>(
+                <Card key={i} style={{marginBottom:'8px',display:'flex',gap:'16px',alignItems:'center'}}>
+                    <div style={{background:'hsl(350,50%,15%)',borderRadius:'8px',padding:'8px 12px',flexShrink:0,textAlign:'center',minWidth:'60px',border:`1px solid hsl(350,50%,25%)`}}>
+                        <div style={{fontSize:'11px',fontWeight:900,color:'hsl(350,80%,65%)'}}>📅</div>
+                        <div style={{fontSize:'10px',color:'var(--muted)',marginTop:'2px'}}>{d.date||'TBD'}</div>
+                    </div>
+                    <div style={{fontSize:'13px',fontWeight:600}}>{d.item}</div>
+                </Card>
+            ))}
+        </Section>
+    );
+    if (tab==='📊Exec Summary') return (
+        <Section title="Executive Summary" accent={accent}>
+            <Card style={{borderLeft:`3px solid ${accent}`}}>
+                <div className="md" dangerouslySetInnerHTML={{__html:fmt(data.executive_summary||data.summary)}}/>
+            </Card>
+            {(data.key_takeaways||[]).length>0 && (
+                <div style={{marginTop:'16px'}}>
+                    {data.key_takeaways.map((t,i)=>(
+                        <div key={i} style={{display:'flex',gap:'12px',padding:'10px 14px',background:'var(--raised)',borderRadius:'10px',marginBottom:'6px',border:'1px solid var(--border)'}}>
+                            <span style={{color:accent,fontWeight:900}}>→</span>
+                            <span style={{fontSize:'13px'}}>{t}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </Section>
+    );
+    return null;
+};
+
+const ResearchView = ({data, accent}) => {
+    const tab = data._activeTab;
+    if (tab==='🔭Core Arguments') return (
+        <Section title="Core Arguments" accent={accent}>
+            {(data.core_arguments||[]).map((a,i)=>(
+                <div key={i} style={{display:'flex',gap:'12px',padding:'14px 16px',background:'var(--raised)',borderRadius:'10px',border:`1px solid hsl(155,30%,18%)`,marginBottom:'8px',alignItems:'flex-start'}}>
+                    <span style={{color:accent,fontWeight:900,flexShrink:0,marginTop:'2px'}}>#{i+1}</span>
+                    <span style={{fontSize:'13px',lineHeight:1.7}}>{a}</span>
+                </div>
+            ))}
+        </Section>
+    );
+    if (tab==='⚖️Counterpoints') return (
+        <Section title="Opposing Viewpoints" accent={accent}>
+            {(data.opposing_viewpoints||[]).map((v,i)=>(
+                <Card key={i} style={{marginBottom:'10px',borderLeft:`3px solid hsl(30,90%,65%)`}}>
+                    <p style={{fontSize:'13px',lineHeight:1.7}}>{v}</p>
+                </Card>
+            ))}
+        </Section>
+    );
+    if (tab==='🧬Frameworks') return (
+        <Section title="Theoretical Frameworks" accent={accent}>
+            {(data.frameworks_used||[]).map((f,i)=>(
+                <Card key={i} style={{marginBottom:'10px'}}>
+                    <div style={{fontWeight:800,fontSize:'14px',color:accent,marginBottom:'6px'}}>{f.name}</div>
+                    <p style={{fontSize:'13px',lineHeight:1.6,color:'hsl(215,15%,75%)'}}>{f.description}</p>
+                </Card>
+            ))}
+        </Section>
+    );
+    if (tab==='💡Insights') return (
+        <Section title="Deeper Insights" accent={accent}>
+            {(data.deeper_insights||[]).map((ins,i)=>(
+                <div key={i} style={{padding:'14px',background:`hsl(155,20%,8%)`,borderRadius:'10px',border:`1px solid hsl(155,30%,18%)`,marginBottom:'8px'}}>
+                    <span style={{fontSize:'16px',marginRight:'10px'}}>💡</span>
+                    <span style={{fontSize:'13px',lineHeight:1.6}}>{ins}</span>
+                </div>
+            ))}
+        </Section>
+    );
+    if (tab==='🗺️Research Paths') return (
+        <Section title="Research Directions" accent={accent}>
+            {(data.research_directions||[]).map((d,i)=>(
+                <div key={i} style={{display:'flex',gap:'12px',padding:'12px 14px',background:'var(--raised)',borderRadius:'10px',border:'1px solid var(--border)',marginBottom:'8px'}}>
+                    <span style={{color:accent,fontWeight:900,flexShrink:0}}>→</span>
+                    <span style={{fontSize:'13px',lineHeight:1.6}}>{d}</span>
+                </div>
+            ))}
+            {(data.knowledge_gaps||[]).length>0 && (
+                <div style={{marginTop:'16px'}}>
+                    <div style={{fontSize:'9px',fontWeight:900,color:'var(--muted)',letterSpacing:'0.15em',marginBottom:'10px'}}>⚠️ KNOWLEDGE GAPS</div>
+                    {data.knowledge_gaps.map((g,i)=>(
+                        <div key={i} style={{fontSize:'12px',padding:'8px 12px',background:'hsl(0,20%,9%)',borderRadius:'8px',border:'1px solid hsl(0,30%,18%)',marginBottom:'6px',color:'hsl(0,60%,75%)'}}>{g}</div>
+                    ))}
+                </div>
+            )}
+        </Section>
+    );
+    return null;
+};
+
+// ── TRANSCRIPT VIEW ────────────────────────────────────────────────────────
+const TranscriptView = ({data}) => (
+    <Section title="Full Transcript">
+        <div style={{background:'var(--raised)',borderRadius:'14px',padding:'20px',border:'1px solid var(--border)',maxHeight:'60vh',overflowY:'auto',fontFamily:'JetBrains Mono',fontSize:'13px',lineHeight:2,color:'hsl(215,15%,70%)'}}>
+            {data.fullTranscript||"Transcript not available."}
+        </div>
+    </Section>
+);
+
+// ── MAIN WORKSPACE ─────────────────────────────────────────────────────────
+const Workspace = ({data}) => {
+    const mode = data?.mode || data?.synthesis_mode || 'exam';
+    const meta = MODE_META[mode] || MODE_META.exam;
+    const tabs = MODE_TABS[mode] || MODE_TABS.exam;
+    const [activeTabKey, setActiveTabKey] = useState(tabs[0][0]+tabs[0][1]);
+    const [chat, setChat] = useState([{role:'bot',content:`I've analyzed your ${meta.label} session. What would you like to explore?`}]);
+    const [chatInput, setChatInput] = useState('');
+    const [thinking, setThinking] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const chatEnd = useRef(null);
+
+    useEffect(()=>{ chatEnd.current?.scrollIntoView({behavior:'smooth'}); },[chat]);
+
+    const activeTabLabel = tabs.find(t=>t[0]+t[1]===activeTabKey)?.[1] || '';
+
+    const askAI = async () => {
+        if (!chatInput.trim()) return;
+        const newChat = [...chat, {role:'user',content:chatInput}];
+        setChat(newChat); setChatInput(''); setThinking(true);
+        try {
+            const res = await window._ps.askAI(chatInput, data.fullTranscript||'', newChat.slice(-4));
+            setChat([...newChat, {role:'bot',content:res}]);
+        } catch(e) {
+            setChat([...newChat, {role:'bot',content:'Neural connection error. Please retry.'}]);
+        }
+        setThinking(false);
+    };
+
+    const renderContent = () => {
+        const d = {...data, _activeTab: activeTabKey};
+        const a = meta.color;
+        if (activeTabKey.includes('Transcript')) return <TranscriptView data={d}/>;
+        if (mode==='exam')            return <ExamView data={d} accent={a}/>;
+        if (mode==='summary')         return <SummaryView data={d} accent={a}/>;
+        if (mode==='podcast')         return <PodcastView data={d} accent={a}/>;
+        if (mode==='memory')          return <MemoryView data={d} accent={a}/>;
+        if (mode==='problem_solving') return <ProblemView data={d} accent={a}/>;
+        if (mode==='interview')       return <InterviewView data={d} accent={a}/>;
+        if (mode==='notes')           return <NotesView data={d} accent={a}/>;
+        if (mode==='productivity')    return <ProductivityView data={d} accent={a}/>;
+        if (mode==='research')        return <ResearchView data={d} accent={a}/>;
+        // Auto fallback: show summary_sheet
+        return <Section title="Synthesis Output" accent={a}><Card><div className="md" dangerouslySetInnerHTML={{__html:fmt(data.summary_sheet||data.summary)}}/></Card></Section>;
+    };
+
+    return (
+        <div style={{display:'flex',height:'100vh',overflow:'hidden'}}>
+            {/* SIDEBAR */}
+            {sidebarOpen && (
+                <aside style={{width:'220px',background:'var(--surface)',borderRight:'1px solid var(--border)',display:'flex',flexDirection:'column',flexShrink:0,overflowY:'auto'}}>
+                    {/* Logo */}
+                    <div style={{padding:'20px 16px 14px',borderBottom:'1px solid var(--border)'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'12px'}}>
+                            <div style={{width:'32px',height:'32px',borderRadius:'10px',background:`linear-gradient(135deg,${meta.color},hsl(252,60%,40%))`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'14px'}}>{meta.emoji}</div>
+                            <span style={{fontWeight:900,fontSize:'14px',letterSpacing:'-0.5px'}}>PrynScribe</span>
+                        </div>
+                        {/* Mode badge */}
+                        <div className="mode-badge" style={{color:meta.color,borderColor:meta.color+'44',background:meta.color+'11',fontSize:'9px'}}>
+                            {meta.emoji} {meta.label}
+                        </div>
+                    </div>
+                    {/* Nav */}
+                    <nav style={{padding:'12px 8px',flex:1}}>
+                        <div style={{fontSize:'9px',fontWeight:900,color:'var(--muted)',letterSpacing:'0.2em',padding:'0 4px',marginBottom:'8px'}}>ARTIFACTS</div>
+                        {tabs.map(([icon,label])=>{
+                            const key = icon+label;
+                            return (
+                                <button key={key} className={`sidebar-btn ${activeTabKey===key?'active':''}`} onClick={()=>setActiveTabKey(key)} style={activeTabKey===key?{color:meta.color}:{}}>
+                                    <span>{icon}</span> {label}
+                                </button>
+                            );
+                        })}
+                    </nav>
+                    {/* Session meta */}
+                    <div style={{padding:'12px',borderTop:'1px solid var(--border)'}}>
+                        {data.quality_score && <div style={{fontSize:'10px',color:'var(--muted)',marginBottom:'4px'}}>Quality: <span style={{color:'#4ade80',fontWeight:700}}>{data.quality_score}/100</span></div>}
+                        {data.estimated_reading_time && <div style={{fontSize:'10px',color:'var(--muted)'}}>Reading time: <span style={{fontWeight:700,color:'var(--text)'}}>{data.estimated_reading_time} min</span></div>}
+                        <div style={{fontSize:'9px',color:'var(--muted)',marginTop:'8px',opacity:0.5,fontFamily:'JetBrains Mono'}}>{new Date().toLocaleDateString()}</div>
+                    </div>
+                </aside>
+            )}
+
+            {/* MAIN CONTENT */}
+            <main style={{flex:1,overflowY:'auto',padding:'40px 48px',position:'relative'}}>
+                {/* Toggle sidebar */}
+                <button onClick={()=>setSidebarOpen(s=>!s)} style={{position:'fixed',top:'16px',left:sidebarOpen?'236px':'12px',background:'var(--raised)',border:'1px solid var(--border)',borderRadius:'8px',padding:'6px 10px',color:'var(--muted)',cursor:'pointer',fontSize:'12px',zIndex:10,transition:'left 0.2s'}}>
+                    {sidebarOpen?'◀':'▶'}
+                </button>
+
+                <div style={{maxWidth:'800px',margin:'0 auto',paddingBottom:'80px'}}>
+                    {/* Header */}
+                    <header style={{marginBottom:'40px'}}>
+                        <div style={{fontSize:'10px',fontWeight:900,letterSpacing:'0.25em',color:'var(--muted)',textTransform:'uppercase',marginBottom:'10px'}}>
+                            {meta.emoji} {meta.label} · Intelligence Report
+                        </div>
+                        <h1 style={{fontSize:'36px',fontWeight:900,letterSpacing:'-1.5px',lineHeight:1.1,marginBottom:'14px',color:'var(--text)'}}>
+                            {data.title||'Academic Session Analysis'}
+                        </h1>
+                        {/* Summary pill */}
+                        <p style={{fontSize:'14px',color:'hsl(215,15%,65%)',lineHeight:1.7,maxWidth:'600px',marginBottom:'16px'}}>
+                            {data.summary?.substring(0,200)}{data.summary?.length>200?'...':''}
+                        </p>
+                        {/* Tags */}
+                        <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                            {(data.tags||[]).map(t=>(
+                                <span key={t} style={{padding:'3px 12px',borderRadius:'99px',background:'var(--raised)',border:'1px solid var(--border)',fontSize:'10px',fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.08em'}}>{t}</span>
+                            ))}
+                        </div>
+                    </header>
+                    {renderContent()}
+                </div>
+            </main>
+
+            {/* AI CHAT PANEL */}
+            <aside style={{width:'300px',background:'var(--surface)',borderLeft:'1px solid var(--border)',display:'flex',flexDirection:'column',flexShrink:0}}>
+                <div style={{padding:'16px',borderBottom:'1px solid var(--border)'}}>
+                    <div style={{fontSize:'10px',fontWeight:900,letterSpacing:'0.2em',color:meta.color,textTransform:'uppercase'}}>Neural Consultant</div>
+                    <div style={{fontSize:'11px',color:'var(--muted)',marginTop:'2px'}}>Ask anything about this session</div>
+                </div>
+                <div style={{flex:1,overflowY:'auto',padding:'12px',display:'flex',flexDirection:'column',gap:'10px'}}>
+                    {chat.map((m,i)=>(
+                        <div key={i} className={`chat-msg ${m.role}`}>{m.content}</div>
+                    ))}
+                    {thinking && <div className="chat-msg bot" style={{color:'var(--muted)',fontStyle:'italic'}}>Analyzing…</div>}
+                    <div ref={chatEnd}/>
+                </div>
+                <div style={{padding:'12px',borderTop:'1px solid var(--border)'}}>
+                    <div style={{display:'flex',gap:'8px'}}>
+                        <input
+                            style={{flex:1,background:'var(--raised)',border:'1px solid var(--border)',borderRadius:'10px',padding:'10px 12px',fontSize:'12px',color:'var(--text)',outline:'none',fontFamily:'Outfit,sans-serif'}}
+                            placeholder="Ask the AI..." value={chatInput}
+                            onChange={e=>setChatInput(e.target.value)}
+                            onKeyDown={e=>e.key==='Enter'&&askAI()}
+                        />
+                        <button onClick={askAI} style={{width:'38px',height:'38px',borderRadius:'10px',background:meta.color,border:'none',color:'#000',fontWeight:900,cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>↑</button>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    );
+};
+
+// ── APP BOOTSTRAP ──────────────────────────────────────────────────────────
+const App = () => {
+    const [data, setData] = useState(null);
+    const [error, setError] = useState(null);
+
+    useEffect(()=>{
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('id');
+        if (!id || !window._ps) { setError("No lecture ID provided."); return; }
+        window._ps.getLectureData(parseInt(id)||id)
+            .then(d => {
+                if (!d) setError("Lecture not found.");
+                else setData(d);
+            })
+            .catch(e => setError("Failed to load: " + e.message));
+    },[]);
+
+    if (error) return (
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',flexDirection:'column',gap:'16px'}}>
+            <div style={{fontSize:'32px'}}>⚠️</div>
+            <div style={{color:'var(--muted)',fontSize:'14px'}}>{error}</div>
+        </div>
+    );
+
+    if (!data) return (
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',flexDirection:'column',gap:'14px'}}>
+            <div style={{width:'48px',height:'48px',borderRadius:'50%',border:'3px solid hsl(252,90%,68%)',borderTopColor:'transparent',animation:'spin 0.8s linear infinite'}}/>
+            <div style={{fontSize:'11px',fontWeight:900,letterSpacing:'0.2em',color:'var(--muted)',textTransform:'uppercase'}}>Loading Intelligence...</div>
+            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        </div>
+    );
+
+    return <Workspace data={data}/>;
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

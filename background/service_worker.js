@@ -1,17 +1,19 @@
-// background/service_worker.js
 import { 
   openDB, addLecture, getLecture, addChunk, getChunk, updateChunk, updateLecture, 
-  getIncompleteLectures, getPendingChunks, getFullTranscript
-} from '../lib/db.js';
+  getIncompleteLectures, getPendingChunks, getFullTranscript, addOutput, syncChunkToCloud
+} from '/lib/db.js';
 
 import { 
   transcribeChunk as transcribeAudio, 
-  processTranscriptChunk, genCoreNotes, genUPSCQs
-} from '../lib/ai_service.js';
+  processTranscriptChunk, genSynthesisArtifact
+} from '/lib/ai_service.js';
+import { SynthesisEngine, calculateXP, calculateLevel, canUserUseMode, MODE_CONFIG } from '/lib/synthesis_engine.js';
+import { translateTranscript, getDefaultOutputLanguage, getLangLabel } from '/lib/language_config.js';
 
 let offscreenReady = false;
 let pendingStart = null;
 let isDraining = false;
+let lastDrainTime = 0;
 
 // --- EMERGENCY STARTUP PURGE ---
 // This ensures that if the engine crashed previously, it doesn't "haunt" the next session
@@ -27,17 +29,49 @@ chrome.runtime.onInstalled.addListener((details) => {
     }
 });
 
-// --- STATELESS RESILIENCE ENGINE ---
+// --- EXTERNAL MESSAGE HANDLER (From Website) ---
+chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
+    console.log("[Worker] Received External Message from:", sender.url || sender.origin);
+    
+    if (msg.type === 'AUTH_SYNC') {
+        const profile = msg.profile;
+        console.log("[Worker] Syncing Auth Profile from Website:", profile?.email || "LOGOUT");
+        
+        if (profile) {
+            chrome.storage.local.set({ 
+                userProfile: profile,
+                isPremium: profile.isPremium || false,
+                userRegion: profile.region || 'GLOBAL',
+                currentMode: profile.examPath || null,
+                currentGoal: profile.goal || null
+            }, () => {
+                console.log("[Worker] Storage updated with profile.");
+                sendResponse({ success: true, status: 'synced' });
+            });
+        } else {
+            chrome.storage.local.remove(['userProfile', 'isPremium', 'userRegion', 'currentMode', 'currentGoal'], () => {
+                console.log("[Worker] Profile cleared.");
+                sendResponse({ success: true, status: 'cleared' });
+            });
+        }
+    }
+    return true; // Keep channel open for async sendResponse
+});
+
+// --- HEARTBEAT & PERSISTENCE ---
 // Persistent keep-alive to prevent Service Worker from falling asleep during long lectures
-let keepAliveInterval = null;
+var keepAliveInterval = null;
+
 function startKeepAlive() {
     if (keepAliveInterval) return;
+    // --- NUCLEAR HEARTBEAT (Every 15s) ---
+    // Critical for 3-hour sessions to prevent Chrome from killing the worker
     keepAliveInterval = setInterval(async () => {
-        try {
-            await chrome.storage.local.get(['isRecording']);
+        const state = await chrome.storage.local.get(['isRecording', 'isSynthesizing']);
+        if (state.isRecording || state.isSynthesizing) {
             console.log("[Worker] Heartbeat: Persistence Active.");
-        } catch (e) {}
-    }, 20000);
+        }
+    }, 15000);
 }
 
 // Resilient startup check - Moved inside a function to handle potential context issues
@@ -45,11 +79,21 @@ async function initializeWorker() {
     try {
         console.log("[Worker] Initializing Resilience Engine...");
         startKeepAlive();
-        const incomplete = await getIncompleteLectures();
-        for (const lecture of incomplete) {
-            console.log(`[Worker] Resuming incomplete lecture: ${lecture.id}`);
-            waitForTranscriptionComplete(lecture.id);
-        }
+        
+        setTimeout(async () => {
+            try {
+                const incomplete = await getIncompleteLectures();
+                for (const lecture of incomplete) {
+                    console.log(`[Worker] Resuming incomplete lecture: ${lecture.id}`);
+                    // Only start synthesis if it's NOT already in progress
+                    // and wait for a manual 'stop' or if we are sure it's finished
+                    // For now, let's just drain the queue.
+                    drainTranscriptionQueue();
+                }
+            } catch (dbErr) {
+                console.error("[Worker] DB Recovery Error:", dbErr);
+            }
+        }, 1000);
     } catch (e) {
         console.error("[Worker] Initialization failed:", e);
     }
@@ -58,56 +102,78 @@ async function initializeWorker() {
 // Global error handler to prevent total crash
 self.addEventListener('error', (event) => {
     console.error("[Worker] UNCAUGHT ERROR:", event.error);
-    // Try to recover if it's a transient issue
-    if (event.error && !event.error.message.includes('keepAliveInterval')) {
-        initializeWorker();
-    }
+    // Recovery attempt is now safer
 });
 
-initializeWorker();
+// Start initialization without blocking the registration of listeners
+initializeWorker().catch(e => console.error("[Worker] Startup failure:", e));
 
 async function drainTranscriptionQueue() {
   startKeepAlive();
+  
+  // --- WATCHDOG: If draining has been stuck for > 6 minutes, force reset ---
+  if (isDraining && (Date.now() - lastDrainTime > 360000)) {
+      console.warn("[Worker] Transcription queue appears stuck. Force resetting lock.");
+      isDraining = false;
+  }
+
   if (isDraining) return;
   isDraining = true;
+  lastDrainTime = Date.now();
   console.log("[Worker] Draining transcription queue...");
   try {
     const incomplete = await getIncompleteLectures();
-    if (incomplete.length === 0) console.log("[Worker] No incomplete lectures found.");
+    console.log(`[Worker] Found ${incomplete.length} incomplete lectures`);
     for (const lecture of incomplete) {
        const pending = await getPendingChunks(lecture.id);
-       if (pending.length > 0) console.log(`[Worker] Found ${pending.length} pending chunks for lecture ${lecture.id}`);
-       
-       // Parallel processing for performance
-       await Promise.all(pending.map(async (chunk) => {
-          if (chunk.retries >= 3) {
-             console.error(`[Worker] Max retries reached for chunk ${chunk.chunkId}.`);
-             await updateChunk(lecture.id, chunk.chunkId, { transcript: "[TRANSCRIPTION_ERROR]" });
-             return;
-          }
-          try {
-             console.log(`[Worker] Transcribing chunk ${chunk.chunkId} (Mode: ${lecture.mode})...`);
-             const transcript = await transcribeAudio(chunk.audioBase64, lecture.mode);
-             console.log(`[Worker] Transcription success for chunk ${chunk.chunkId}: ${transcript.substring(0, 30)}...`);
-             await updateChunk(lecture.id, chunk.chunkId, { 
-                transcript: transcript || "[SILENT_AUDIO]",
-                retries: (chunk.retries || 0) + 1 
-             });
-          } catch (e) {
-             console.error(`[Worker] Transcription error for chunk ${chunk.chunkId}:`, e);
-             const errorMessage = e.message || "Unknown Transcription Error";
-             
-             // Check for critical API errors
-             if (errorMessage.includes("401") || errorMessage.includes("403")) {
-                 console.error("[Worker] Critical API error detected. Stopping session.");
-                 await updateLecture(lecture.id, { status: 'error', error_message: "Invalid API Key. Please check settings." });
-                 await chrome.storage.local.set({ isRecording: false, isSynthesizing: false, last_error: "API KEY ERROR: Check your Deepgram Key." });
-                 return; // Exit loop
-             }
-             
-             await updateChunk(lecture.id, chunk.chunkId, { retries: (chunk.retries || 0) + 1 });
-          }
-       }));
+       console.log(`[Worker] Lecture ${lecture.id} has ${pending.length} pending chunks`);
+       if (pending.length === 0) continue;
+
+       // --- BATCHED SERIAL PROCESSING (MAX 2) ---
+       // Reduced from 3 to 2 to improve stability on weak connections
+       const BATCH_SIZE = 2;
+       for (let i = 0; i < pending.length; i += BATCH_SIZE) {
+           const batch = pending.slice(i, i + BATCH_SIZE);
+           
+           await chrome.storage.local.set({ 
+               progress_text: `Step 1/3: Transcribing (${i + batch.length}/${pending.length})...` 
+           });
+
+           await Promise.all(batch.map(async (chunk) => {
+               if (chunk.retries >= 5) { // Increased from 3 to 5
+                   await updateChunk(lecture.id, chunk.chunkId, { transcript: "[TRANSCRIPTION_ERROR]" });
+                   return;
+               }
+               try {
+                   console.log(`[Worker] Transcribing chunk ${chunk.chunkId} (Attempt ${(chunk.retries || 0) + 1})...`);
+                   const _tResult = await transcribeAudio(chunk.audioBase64, null);
+                    const transcript = typeof _tResult === 'string' ? _tResult : (_tResult?.transcript || '');
+                    const detectedLang = typeof _tResult === 'object' ? (_tResult?.detectedLang || 'en') : 'en';
+                    // Store detected language for synthesis layer
+                    const _ls = await chrome.storage.local.get(['detectedSourceLang']);
+                    if (detectedLang !== _ls.detectedSourceLang) { await chrome.storage.local.set({ detectedSourceLang: detectedLang }); chrome.runtime.sendMessage({ type: 'language_detected', lang: detectedLang }).catch(()=>{}); }
+                   await updateChunk(lecture.id, chunk.chunkId, { 
+                       transcript: transcript || "[SILENCE]",
+                       retries: (chunk.retries || 0) + 1 
+                   });
+                   
+                   // --- PROACTIVE BROADCAST: Push to Popup for Live Scribe ---
+                   console.log(`[Worker] Sending transcript_update for lecture ${lecture.id}: "${transcript.substring(0, 30)}..."`);
+                    syncChunkToCloud(lecture.id, chunk.chunkId, transcript);
+                   chrome.runtime.sendMessage({ 
+                       type: 'transcript_update', 
+                       lectureId: lecture.id, 
+                       text: transcript 
+                   }).catch(() => {});
+               } catch (e) {
+                   console.error(`[Worker] Chunk ${chunk.chunkId} failed:`, e.message);
+                   await updateChunk(lecture.id, chunk.chunkId, { 
+                       retries: (chunk.retries || 0) + 1,
+                       last_error: e.message
+                   });
+               }
+           }));
+       }
     }
   } finally {
     isDraining = false;
@@ -168,13 +234,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // We don't owe an asynchronous sendResponse to offscreen_ready
     return false;
   } else if (msg.type === 'saveChunk') {
+    if (!msg.lectureId) {
+        console.warn("[Worker] Received saveChunk with null lectureId. Ignoring.");
+        return false;
+    }
     console.log(`[Worker] Received saveChunk for lecture ${msg.lectureId}, chunk ${msg.chunkId}`);
     // Use a queue or direct call to avoid potential race conditions during high-frequency saves
     const saveToDB = async () => {
         try {
             await addChunk({ 
-                lectureId: msg.lectureId, 
-                chunkId: msg.chunkId, 
+                lectureId: msg.lectureId.toString(), 
+                chunkId: parseInt(msg.chunkId), 
                 audioBase64: msg.audioBase64, 
                 transcript: null, 
                 retries: 0 
@@ -216,13 +286,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ status: 'warmer' });
         return false;
     } else if (msg.action === 'start') {
-        console.log(`[Worker] START SESSION: Lecture ${msg.lectureId} (Mode: ${msg.mode})`);
+        console.log(`[Worker] START SESSION: Lecture ${msg.lectureId} (Mode: ${msg.mode}) with StreamID ${msg.streamId}`);
         // --- START PROTOCOL ---
         const newLecture = {
             id: msg.lectureId,
             status: 'incomplete',
-            mode: msg.mode || 'exam', // Use passed mode
-            speed: msg.speed || 1.0, // Store speed for recorder reference
+            mode: msg.mode || 'exam', 
+            goal: msg.goal || 'Academic Excellence',
+            region: msg.region || 'GLOBAL',
+            speed: msg.speed || 1.0, 
             createdAt: Date.now(),
             chunks: []
         };
@@ -231,6 +303,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }).catch(e => console.error("[Worker] DB Error creating lecture:", e));
 
         if (offscreenReady) {
+            console.log("[Worker] Offscreen ready, sending start message.");
             chrome.runtime.sendMessage({ type: 'start', streamId: msg.streamId, lectureId: msg.lectureId, speed: msg.speed });
             sendResponse({ status: 'started' });
             return false;
@@ -240,18 +313,51 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             ensureOffscreenDocument();
             return true; // We WILL call sendResponse asynchronously when offscreen_ready fires
         }
+    } else if (msg.action === 'drain') {
+        drainTranscriptionQueue();
+        sendResponse({ status: 'draining' });
+        return false;
     } else if (msg.action === 'stop') {
-        console.log(`[Worker] STOP SESSION: Lecture ${msg.lectureId}`);
+        const lectureId = msg.lectureId || pendingStart?.lectureId;
+        console.log(`[Worker] STOP SESSION: Lecture ${lectureId}`);
         chrome.runtime.sendMessage({ type: 'stop' });
-        waitForTranscriptionComplete(msg.lectureId);
+        if (lectureId) {
+            waitForTranscriptionComplete(lectureId);
+        } else {
+            console.error("[Worker] Stop called but no active Lecture ID found.");
+        }
         sendResponse({ status: 'stopped' });
         return false;
     }
+  } else if (msg.type === 'signal_level') {
+    // Forward to any open tabs (especially the dashboard)
+    chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+            // Only send to valid tabs to avoid overhead
+            try {
+                chrome.tabs.sendMessage(tab.id, { type: 'signal_level', level: msg.level }).catch(() => {});
+            } catch(e) {}
+        });
+    });
+    return false;
+  } else if (msg.type === 'AUTH_SYNC') {
+    console.log("[Worker] Received Auth Sync Profile:", msg.profile ? msg.profile.email : "LOGOUT");
+    if (msg.profile) {
+        chrome.storage.local.set({ userProfile: msg.profile });
+    } else {
+        chrome.storage.local.remove(['userProfile']);
+    }
+    return false;
   }
   return false;
 });
 
 async function waitForTranscriptionComplete(lectureId) {
+    if (!lectureId) {
+        console.error("[Worker] Cannot wait for transcript: lectureId is missing.");
+        await chrome.storage.local.set({ isSynthesizing: false, last_error: "Engine Error: Missing Session ID" });
+        return;
+    }
     let attempts = 0;
     const maxAttempts = 120;
     await chrome.storage.local.set({ isSynthesizing: true });
@@ -263,7 +369,11 @@ async function waitForTranscriptionComplete(lectureId) {
         const tx = db.transaction('chunks', 'readonly');
         const store = tx.objectStore('chunks');
         const index = store.index('lectureId');
-        const range = IDBKeyRange.only(lectureId);
+        
+        // Final safety check
+        if (!lectureId) return;
+        const sanitizedId = lectureId.toString();
+        const range = IDBKeyRange.only(sanitizedId);
         const allChunks = await new Promise(r => {
             const req = index.getAll(range);
             req.onsuccess = () => r(req.result);
@@ -273,145 +383,177 @@ async function waitForTranscriptionComplete(lectureId) {
         
         console.log(`[Worker] Polling status: ${allChunks.length} chunks total, ${pending.length} pending.`);
 
-        if (allChunks.length > 0 && pending.length === 0) {
-            const fullTranscript = await getFullTranscript(lectureId);
-            if (fullTranscript.length > 50) {
-                console.log(`[Worker] Transcription complete (${fullTranscript.length} chars). Starting AI Synthesis.`);
+        // --- 90% BRAVE EXIT RULE ---
+        // If we have been waiting more than 60 seconds (attempts > 30) AND 
+        // less than 3 chunks are missing, proceed anyway.
+        const shouldBraveExit = attempts > 30 && pending.length > 0 && pending.length < 3;
+
+        if (allChunks.length > 0) {
+            await chrome.storage.local.set({ 
+                progress_text: `Processing fragments (${pending.length} left)...` 
+            });
+        }
+
+        const fullTranscript = await getFullTranscript(lectureId);
+        const transcriptLength = fullTranscript?.trim().length || 0;
+
+        // --- SYNTHESIS DECISION ---
+        if (allChunks.length > 0 && (pending.length === 0 || shouldBraveExit)) {
+            console.log(`[Worker] All chunks accounted for (${allChunks.length}). Checking transcript quality...`);
+            
+            if (transcriptLength > 50) {
+                console.log(`[Worker] Transcription complete (${transcriptLength} chars). Starting AI Synthesis.`);
                 await updateLecture(lectureId, { status: 'synthesizing' });
-                startUPSCThinkingEngine(lectureId);
-            } else if (attempts < 60) {
-                console.log("[Worker] Transcript too short, waiting for more data...");
+                startNeuralSynthesisEngine(lectureId);
+            } else {
+                console.warn(`[Worker] Session ended with insufficient transcript (${transcriptLength} chars). Marking as too short.`);
+                await updateLecture(lectureId, { status: 'error', error_message: "Session too short or no speech detected." });
+            }
+        } else {
+            // Keep polling if we still have pending chunks or session is still active
+            if (attempts < 120) { // Increased from 60 to 120 (4 minutes)
                 attempts++;
                 setTimeout(poll, 2000);
             } else {
-                console.warn("[Worker] Session too short after 120s of polling.");
-                await updateLecture(lectureId, { status: 'error', error_message: "Session too short." });
-                await chrome.storage.local.set({ isSynthesizing: false, last_error: "Session too short. Ensure you recorded for at least 30-60s." });
+                console.error("[Worker] Transcription polling timed out after 4 minutes.");
+                await updateLecture(lectureId, { status: 'error', error_message: "Transcription timed out." });
             }
-        } else if (attempts < maxAttempts) {
-            attempts++;
-            drainTranscriptionQueue();
-            setTimeout(poll, 2000);
-        } else {
-            console.error("[Worker] Transcription timeout reached.");
-            await updateLecture(lectureId, { status: 'error', error_message: "Transcription timeout." });
-            await chrome.storage.local.set({ isSynthesizing: false, last_error: "Transcription timeout." });
         }
     };
     poll();
 }
 
 /**
- * --- THE UPSC THINKING ENGINE PIPELINE ---
- * 1. Windowing: Split transcript into 4m 50s blocks.
- * 2. Layer 1: Process each block with Groq.
- * 3. Layer 2: Merge into Master Data Schema.
- * 4. Derivation: Run 6 agents in parallel groups.
+ * --- THE NEURAL SYNTHESIS ENGINE PIPELINE ---
+ * 1. Context: Fetch User Exam Path & Goal.
+ * 2. Layer 1: Build Knowledge Blocks.
+ * 3. Layer 2: Synthesize Artifacts via path-specific Engine.
  */
-async function startUPSCThinkingEngine(lectureId) {
+async function startNeuralSynthesisEngine(lectureId) {
     try {
-        const fullTranscript = await getFullTranscript(lectureId);
+        const lecture = await getLecture(lectureId);
+        if (!lecture) throw new Error("Lecture not found for synthesis");
         
-        if (!fullTranscript || fullTranscript.length < 50) {
-            throw new Error("Transcript too short for processing.");
-        }
-
-        // --- 1. SMART WINDOWING (15,000 characters) ---
-        const windowSize = 15000; 
-        const windows = [];
-        for (let i = 0; i < fullTranscript.length; i += windowSize) {
-            windows.push(fullTranscript.substring(i, i + windowSize));
-        }
-
-        // Clean up transcript before processing - remove error markers
-        const cleanWindows = windows.map(w => w.replace(/\[TRANSCRIPTION_ERROR\]/g, "").trim()).filter(w => w.length > 20);
+        // --- 1. CONTEXT INITIALIZATION ---
+        const userState = await chrome.storage.local.get(['userProfile', 'userOnboarding', 'outputLanguage', 'selectedMode', 'detectedSourceLang', 'preferredOutputLang']);
+        const examPath = lecture.mode || userState.userOnboarding?.path || 'General';
+        const goal = lecture.goal || userState.userOnboarding?.goal || 'Learning';
+        const userTier = userState.userProfile?.tier || 'free';
         
-        if (cleanWindows.length === 0) {
-            throw new Error("No valid academic content found in transcript.");
+        // v28 Safeguard: Abort if transcript is too sparse
+        const rawTranscript = await getFullTranscript(lectureId);
+        if (!rawTranscript || rawTranscript.length < 50) {
+            console.warn("[Worker] Synthesis aborted: Transcript too sparse.");
+            throw new Error("Learning Artifact was too sparse (under 50 chars). Please check your audio source.");
         }
-
-        // --- 2. LAYER 1: PARALLEL KNOWLEDGE EXTRACTION (GROQ 8B) ---
-        await chrome.storage.local.set({ progress_text: `Extracting Knowledge (0/${cleanWindows.length})...` });
+  
+        // --- 1B. LANGUAGE PIPELINE ---
+        // Layer A: Source language (detected during transcription)
+        const sourceLang = userState.detectedSourceLang || 'en';
+        // Layer C: Target output language (user preference or default English)
+        const outputLangCode = userState.preferredOutputLang || userState.outputLanguage || 'en';
+        const outputLanguage = getLangLabel(outputLangCode) || 'English';
         
-        const chunkSchemas = [];
-        const batchSize = 3;
-        for (let i = 0; i < cleanWindows.length; i += batchSize) {
-            const batch = cleanWindows.slice(i, i + batchSize);
-            const batchResults = await Promise.all(batch.map(w => processTranscriptChunk(w)));
-            chunkSchemas.push(...batchResults.filter(r => r && Object.keys(r).length > 0));
-            await chrome.storage.local.set({ progress_text: `Extracting Knowledge (${Math.min(i + batchSize, cleanWindows.length)}/${cleanWindows.length})...` });
-        }
-
-        if (chunkSchemas.length === 0) {
-            throw new Error("Failed to extract structured knowledge from transcript.");
-        }
-
-        // --- 3. LAYER 2: MASTER SYNTHESIS (DUAL-CORE) ---
-        let agentsFinished = 0;
-        let tabOpened = false;
-        await chrome.storage.local.set({ progress_text: "Synthesizing Insights (0/2)..." });
-
-        const checkUnlock = async () => {
-            agentsFinished++;
-            await chrome.storage.local.set({ progress_text: `Synthesizing Insights (${agentsFinished}/2)...` });
-            if (agentsFinished >= 1 && !tabOpened) {
-                tabOpened = true;
-                chrome.tabs.create({ url: chrome.runtime.getURL(`pages/transcript.html?id=${lectureId}`) });
+        // Layer C: Translate if source != output (pro/elite only, but always translate if different)
+        let fullTranscript = rawTranscript;
+        if (sourceLang !== outputLangCode && rawTranscript.length > 50) {
+            await chrome.storage.local.set({ progress_text: `🌐 Translating ${getLangLabel(sourceLang)} → ${getLangLabel(outputLangCode)}...` });
+            console.log(`[Worker] Translating transcript from ${sourceLang} to ${outputLangCode}...`);
+            try {
+                const keys = await chrome.storage.local.get(['groq_api_key']);
+                const groqKey = keys.groq_api_key || "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";
+                fullTranscript = await translateTranscript(rawTranscript, sourceLang, outputLangCode, groqKey);
+                console.log(`[Worker] ✓ Translation complete. ${rawTranscript.length} chars → ${fullTranscript.length} chars`);
+            } catch(e) {
+                console.warn('[Worker] Translation failed, using source:', e.message);
+                fullTranscript = rawTranscript;
             }
+        }
+
+        const engine = new SynthesisEngine(examPath, goal, outputLanguage, userTier);
+        
+        // --- 2. MODE ROUTING ---
+        // Resolve the synthesis mode: use saved selection, or auto-detect
+        let synthesisMode = userState.selectedMode || lecture.mode || 'auto';
+        
+        // Tier enforcement: downgrade if user doesn't have access
+        if (!canUserUseMode(synthesisMode, userTier)) {
+            console.warn(`[Worker] User tier '${userTier}' cannot use '${synthesisMode}'. Falling back to 'summary'.`);
+            synthesisMode = 'summary';
+        }
+        
+        // Auto-mode: let the engine detect the best mode
+        if (synthesisMode === 'auto') {
+            synthesisMode = engine.detectMode(fullTranscript.substring(0, 500), examPath);
+            console.log(`[Worker] 🤖 Auto-Mode selected: ${synthesisMode}`);
+        }
+        
+        console.log(`[Worker] Synthesis Engine: ${examPath} | Mode: ${synthesisMode} | Lang: ${outputLanguage}`);
+
+        // --- 3. SINGLE-PASS SYNTHESIS (New Elite Architecture) ---
+        await chrome.storage.local.set({ progress_text: `⚡ Synthesizing [${(MODE_CONFIG[synthesisMode]?.label || synthesisMode).toUpperCase()}]...` });
+        
+        const artifact = await genSynthesisArtifact(fullTranscript, engine, synthesisMode);
+
+        // --- 4. FINAL HANDOFF & SYNC ---
+        // Map universal artifact schema → lecture store fields
+        const finalUpdates = {
+            status: 'complete',
+            mode: synthesisMode,
+            title: artifact.title || "Academic Session Analysis",
+            tags: artifact.tags || [],
+            summary: artifact.summary || "",
+            summary_sheet: artifact.master_summary_sheet || artifact.rapid_summary || artifact.narrative_script || artifact.printable_one_pager || artifact.executive_summary || artifact.summary || "",
+            key_points: artifact.key_points || artifact.revision_notes || artifact.follow_up_tasks || [],
+            glossary: artifact.glossary || [],
+            mcqs: artifact.mcqs || [],
+            flashcards: artifact.flashcards || artifact.spaced_repetition || [],
+            // Mode-specific rich fields stored as raw JSON
+            artifact_data: artifact
         };
 
-        const tasks = [
-            genCoreNotes(chunkSchemas).then(async d => {
-                if (!d || !d.title) throw new Error("Synthesis produced empty notes.");
-                await updateLecture(lectureId, { 
-                    title: d.title, 
-                    tags: d.tags,
-                    summary_sheet: d.summary,
-                    key_points: d.key_points,
-                    glossary: d.glossary,
-                    mindmap_data: d.mindmap_data
-                });
-                checkUnlock();
-            }).catch(e => { 
-                console.error("Core Notes failed:", e); 
-                checkUnlock(); 
-            }),
-
-            genUPSCQs(chunkSchemas).then(async d => {
-                if (!d || !d.mcqs) throw new Error("Synthesis produced no MCQs.");
-                await updateLecture(lectureId, { 
-                    mcqs: d.mcqs,
-                    mains_questions: d.mains_questions
-                });
-                checkUnlock();
-            }).catch(e => { 
-                console.error("UPSC Engine failed:", e); 
-                checkUnlock(); 
-            })
-        ];
-
-        // Global timeout for synthesis tasks (5 minutes)
-        const synthesisTimeout = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Synthesis Timeout (5m exceeded)")), 300000)
-        );
-
-        await Promise.race([Promise.allSettled(tasks), synthesisTimeout]);
-
-        // Verify if we actually got data
-        const lectureFinal = await getLecture(lectureId);
-        if (!lectureFinal.title && !lectureFinal.mcqs) {
-            throw new Error("AI Synthesis failed to produce any data. Check API keys and transcript quality.");
-        }
-
-        await updateLecture(lectureId, { status: 'complete' });
-        await chrome.storage.local.set({ isSynthesizing: false, progress_text: null });
+        await updateLecture(lectureId, finalUpdates);
         
-        if (!tabOpened) {
-            chrome.tabs.create({ url: chrome.runtime.getURL(`pages/transcript.html?id=${lectureId}`) });
+        const lectureFinal = await getLecture(lectureId);
+        await chrome.storage.local.set({ progress_text: "☁️ Syncing to Cloud..." });
+        
+        // --- NUCLEAR VALIDATION ---
+        if (!finalUpdates.summary_sheet || finalUpdates.summary_sheet.length < 30) {
+            console.error("[Worker] Synthesis Validation Failed: Summary is missing or too short.");
+            throw new Error("Learning Artifact was too sparse. Please check audio quality and retry.");
         }
+        
+        await addOutput(lectureId.toString(), lectureFinal);
+        
+        // --- 5. XP AWARD ---
+        try {
+            const storedXP = await chrome.storage.local.get(['xp', 'level', 'streak_days']);
+            const currentXP = storedXP.xp || 0;
+            const streakDays = storedXP.streak_days || 0;
+            const earnedXP = calculateXP(fullTranscript.length, streakDays);
+            const newTotalXP = currentXP + earnedXP;
+            const newLevel = calculateLevel(newTotalXP);
+            await chrome.storage.local.set({ xp: newTotalXP, level: newLevel });
+            console.log(`[Worker] 🏆 +${earnedXP} XP earned! Total: ${newTotalXP} (Level ${newLevel})`);
+            chrome.runtime.sendMessage({ type: 'xp_update', earned: earnedXP, total: newTotalXP, level: newLevel }).catch(() => {});
+        } catch (e) { console.warn("[Worker] XP award failed:", e.message); }
+        
+        await chrome.storage.local.set({ isSynthesizing: false, progress_text: null, currentLectureId: null });
+        
+        // --- PROACTIVE NOTIFICATION ---
+        chrome.runtime.sendMessage({ type: 'synthesis_complete', lectureId: lectureId, mode: synthesisMode }).catch(() => {});
+        
+        
     } catch (e) {
         console.error("UPSC Engine Pipeline Crashed:", e);
         await updateLecture(lectureId, { status: 'error', error_message: e.message });
         await chrome.storage.local.set({ isSynthesizing: false, last_error: "Engine Crash: " + e.message, progress_text: null });
+        
+        // FAIL-SAFE HANDOFF
+        chrome.tabs.create({ url: chrome.runtime.getURL(`pages/transcript.html?id=${lectureId}`) });
+    } finally {
+        // Absolute safety reset
+        await chrome.storage.local.set({ isSynthesizing: false, progress_text: null });
     }
 }
+

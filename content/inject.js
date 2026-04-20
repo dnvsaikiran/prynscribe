@@ -10,23 +10,41 @@
     // Listen for updates from the Isolated World (content/script.js)
     window.addEventListener('message', (event) => {
         if (event.data && event.data.type === 'PRYSM_SYNC') {
-            targetSpeed = event.data.speed;
-            targetVolume = event.data.volume;
+            if (event.data.speed !== undefined) targetSpeed = event.data.speed;
+            if (event.data.volume !== undefined) targetVolume = event.data.volume;
             isLocked = true;
             applyNow();
         }
     });
 
+    // --- AUTH SYNC BRIDGE ---
+    window.addEventListener('PRYSM_AUTH_SYNC', (event) => {
+        window.postMessage({ type: 'PRYSM_AUTH_TRANSFER', profile: event.detail }, '*');
+    });
+
     function applyNow() {
-        const videos = document.querySelectorAll('video');
-        videos.forEach(v => {
+        const queryVideos = (root) => {
+            let videos = Array.from(root.querySelectorAll('video'));
+            const allElements = root.querySelectorAll('*');
+            allElements.forEach(el => {
+                if (el.shadowRoot) {
+                    try {
+                        videos = videos.concat(queryVideos(el.shadowRoot));
+                    } catch (e) {}
+                }
+            });
+            return videos;
+        };
+
+        const allVideos = queryVideos(document);
+        allVideos.forEach(v => {
             // Direct set using native descriptors to bypass site overrides
             try {
                 const speedDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'playbackRate');
                 const volDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'volume');
                 
-                speedDesc.set.call(v, targetSpeed);
-                volDesc.set.call(v, targetVolume);
+                if (speedDesc && speedDesc.set) speedDesc.set.call(v, targetSpeed);
+                if (volDesc && volDesc.set) volDesc.set.call(v, targetVolume);
             } catch (e) {
                 v.playbackRate = targetSpeed;
                 v.volume = targetVolume;

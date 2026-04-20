@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrynScribe — Elite Intelligence Dashboard</title>
+    <meta name="description" content="PrynScribe converts lectures, meetings and podcasts into elite AI study artifacts. The most advanced learning intelligence suite.">
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/overhaul.css">
+    <link rel="stylesheet" href="css/modes.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- 1. ELITE COMMANDER HEADER -->
+    <header class="main-header glass-card" style="border-radius: 0; border: none; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.85); position: fixed; top: 0; width: 100%; z-index: 1000; padding: 15px 0;">
+        <div style="max-width: 1100px; margin: 0 auto; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 0 20px;">
+            <div class="header-logo" style="font-size: 18px; font-weight: 800;">PRYNSCRIBE</div>
+            
+            <div id="header-user-badge" class="header-profile" style="display: none;">
+                <div class="profile-meta" style="text-align: right;">
+                    <span id="header-user-name" class="profile-name" style="display: block; font-size: 11px; font-weight: 900;">COMMANDER</span>
+                    <span id="header-user-plan" class="profile-plan" style="font-size: 9px; color: var(--accent);">ELITE</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard-container" style="padding-top: 100px;">
+        <!-- 2. AUTH LOADING / LOGIN -->
+        <section id="auth-loading" style="text-align: center; padding: 100px 0;">
+            <div class="pulsing-core" style="font-size: 11px; font-weight: 950; text-transform: uppercase; letter-spacing: 0.3em; color: var(--accent);">INITIALIZING NEURAL GRID...</div>
+        </section>
+
+        <section id="auth-section" class="hero" style="display: none; padding: 80px 20px; text-align: center; position: relative; overflow: hidden;">
+            <!-- Background glow orbs -->
+            <div style="position:absolute; top:-100px; left:50%; transform:translateX(-50%); width:600px; height:400px; background: radial-gradient(ellipse, rgba(99,102,241,0.12) 0%, transparent 70%); pointer-events:none;"></div>
+            <div style="position:absolute; bottom:-80px; left:30%; width:300px; height:300px; background: radial-gradient(ellipse, rgba(168,85,247,0.08) 0%, transparent 70%); pointer-events:none;"></div>
+
+            <!-- Feature pills -->
+            <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-bottom:36px;">
+                <span style="padding:5px 14px; border-radius:99px; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); font-size:10px; font-weight:800; color:hsl(252,80%,78%); letter-spacing:0.1em;">🏆 10 AI MODES</span>
+                <span style="padding:5px 14px; border-radius:99px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); font-size:10px; font-weight:800; color:rgba(255,255,255,0.5); letter-spacing:0.1em;">🌐 15 LANGUAGES</span>
+                <span style="padding:5px 14px; border-radius:99px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); font-size:10px; font-weight:800; color:rgba(255,255,255,0.5); letter-spacing:0.1em;">⚡ LIVE TRANSCRIPTION</span>
+                <span style="padding:5px 14px; border-radius:99px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); font-size:10px; font-weight:800; color:rgba(255,255,255,0.5); letter-spacing:0.1em;">🎓 EXAM READY</span>
+            </div>
+
+            <!-- Hero headline with gradient -->
+            <h1 style="font-size: clamp(52px, 8vw, 88px); line-height: 0.92; margin-bottom: 28px; font-weight: 900; letter-spacing: -4px; background: linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.7) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                Capture<br>Intelligence.
+            </h1>
+
+            <p style="color: rgba(255,255,255,0.45); margin-bottom: 48px; max-width: 480px; margin-left: auto; margin-right: auto; font-size: 16px; line-height: 1.7; font-weight: 400;">
+                The world's most advanced AI learning engine. Record any lecture, class, or meeting — and get elite study artifacts in seconds.
+            </p>
+
+            <button id="login-btn" class="btn-primary-rect" style="font-size:13px; padding:18px 48px; border-radius:99px;">
+                ACCESS COMMAND CENTER →
+            </button>
+
+            <!-- Social proof counter -->
+            <div style="margin-top: 64px; opacity: 0.3;">
+                <div style="font-size:9px; font-weight:900; letter-spacing:0.25em; color:rgba(255,255,255,0.6); margin-bottom:6px;">GLOBAL INTELLIGENCE CAPACITY</div>
+                <div id="global-synthesis-count" style="font-family: 'JetBrains Mono',monospace; font-size:20px; font-weight:800; letter-spacing:-1px;">1,240,402 PAGES</div>
+            </div>
+        </section>
+
+        <!-- 3. MAIN USER DASHBOARD -->
+        <section id="user-section" style="display: none; flex-direction: column; gap: 28px;">
+
+            <!-- A. USER HERO + XP PANEL -->
+            <div class="glass-card" style="padding: 32px 40px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 24px;">
+                    <!-- Identity -->
+                    <div style="display: flex; align-items: center; gap: 24px;">
+                        <div class="mascot-hub" style="width: 80px; height: 80px; background: radial-gradient(circle, var(--accent-glow) 0%, transparent 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <img id="exam-persona-icon" src="assets/icons/policy.png" alt="Persona" style="width: 64px; height: 64px; object-fit: contain;">
+                        </div>
+                        <div>
+                            <h1 id="user-name-title" style="font-size: 28px; font-weight: 900; letter-spacing: -1.5px; margin-bottom: 8px;">Hi, COMMANDER.</h1>
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <span id="user-plan-badge" class="badge-pill premium">ELITE PLAN</span>
+                                <button id="change-path-btn" style="color: var(--accent); font-weight: 800; font-size: 11px; background: none; border: none; cursor: pointer; letter-spacing: 0.05em;">GOAL: UPSC</button>
+                                <!-- Streak Badge (shown if streak > 0) -->
+                                <span id="streak-badge" style="display:none; padding: 3px 10px; border-radius: 99px; background: hsl(30,90%,12%); border: 1px solid hsl(30,60%,25%); font-size: 10px; font-weight: 900; color: hsl(30,90%,65%);">🔥 <span id="streak-count">0</span> Day Streak</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="logout-btn" class="btn-outline-rect" style="padding: 10px 20px; font-size: 10px; flex-shrink: 0;">DISCONNECT</button>
+                </div>
+
+                <!-- XP Progress Bar -->
+                <div style="margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border);">
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <!-- Level Badge -->
+                        <div id="xp-level-badge" style="width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, hsl(252,90%,68%), hsl(320,85%,70%)); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; color: #fff; flex-shrink: 0; box-shadow: 0 4px 16px hsl(252,90%,40%,0.35);">1</div>
+                        <div style="flex: 1;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                                <span style="font-size: 11px; font-weight: 800;">Level <span id="xp-level-label">1</span> Scholar</span>
+                                <span style="font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace;"><span id="xp-total">0</span> XP</span>
+                            </div>
+                            <div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden;">
+                                <div id="xp-bar-fill" style="height: 100%; width: 0%; border-radius: 99px; background: linear-gradient(90deg, hsl(252,90%,68%), hsl(320,85%,70%)); transition: width 1s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 0 8px hsl(252,90%,68%,0.5);"></div>
+                            </div>
+                            <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">Next level: <span id="xp-next">100</span> XP needed</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- B. MODE SELECTOR PANEL -->
+            <div class="glass-card" style="padding: 28px 32px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div>
+                        <div style="font-size: 10px; font-weight: 900; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; margin-bottom: 4px;">Intelligence System</div>
+                        <div style="font-size: 18px; font-weight: 900;">Synthesis Mode</div>
+                    </div>
+                    <div id="active-mode-display" style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 12px;">
+                        <span id="dash-mode-emoji" style="font-size: 20px;">✨</span>
+                        <div>
+                            <div style="font-size: 9px; color: var(--muted); font-weight: 800; letter-spacing: 0.1em;">ACTIVE MODE</div>
+                            <div id="dash-mode-label" style="font-size: 12px; font-weight: 900;">Auto Mode</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Mode Selector UI injected here -->
+                <div id="dash-mode-selector-root"></div>
+            </div>
+
+            <!-- C. SYSTEM HEALTH & TELEMETRY -->
+            <div class="card-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                <div class="dash-card">
+                    <div class="card-meta">Node Connection</div>
+                    <div class="card-value" id="sync-value"><span style="color: #4ade80;">●</span> Node Online</div>
+                    <div class="card-desc">Archive synchronized across extension, web, and cloud nodes.</div>
+                </div>
+                <div class="dash-card" style="border-color: var(--accent-glow);">
+                    <div class="card-meta">Neural Quota</div>
+                    <div class="card-value" id="quota-value">2 Sessions Left</div>
+                    <div class="progress-track" style="width:100%; height:6px; background: rgba(255,255,255,0.05); border-radius: 99px; margin-top: 15px; overflow: hidden;">
+                        <div id="quota-progress" class="progress-fill premium" style="width: 100%; height: 100%; background: var(--accent);"></div>
+                    </div>
+                    <button id="pay-btn" class="text-link" style="margin-top: 15px; background: none; border: none; color: var(--accent); cursor: pointer; font-size: 11px;">UPGRADE CAPACITY →</button>
+                </div>
+                <div class="dash-card">
+                    <div class="card-meta">Sessions Synthesized</div>
+                    <div class="card-value" id="user-synthesis-count">0 PAGES</div>
+                    <div class="card-desc">Expert-grade study artifacts generated from your sessions.</div>
+                </div>
+            </div>
+
+            <!-- D. LANGUAGE PREFERENCE -->
+            <div class="dash-card" style="padding: 24px 28px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                    <div>
+                        <div class="card-meta">Language Intelligence</div>
+                        <div style="font-size: 15px; font-weight: 800; margin-top: 2px;">
+                            <span id="dash-source-lang">🌐 Auto-Detect</span>
+                            <span style="color: var(--muted); margin: 0 8px;">→</span>
+                            <span id="dash-output-lang" style="color: hsl(252,80%,75%);">English Output</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="dash-output-lang-select" style="background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 10px; padding: 8px 14px; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer;">
+                            <option value="en">🇬🇧 English</option>
+                            <option value="hi">🇮🇳 Hindi</option>
+                            <option value="te">🇮🇳 Telugu</option>
+                            <option value="ta">🇮🇳 Tamil</option>
+                            <option value="kn">🇮🇳 Kannada</option>
+                            <option value="ml">🇮🇳 Malayalam</option>
+                            <option value="es">🇪🇸 Spanish</option>
+                            <option value="fr">🇫🇷 French</option>
+                            <option value="de">🇩🇪 German</option>
+                            <option value="pt">🇧🇷 Portuguese</option>
+                            <option value="ar">🇸🇦 Arabic</option>
+                            <option value="ja">🇯🇵 Japanese</option>
+                            <option value="ko">🇰🇷 Korean</option>
+                            <option value="zh">🇨🇳 Chinese</option>
+                        </select>
+                        <button id="dash-save-lang-btn" style="padding: 8px 18px; border-radius: 10px; background: hsl(252,90%,60%); border: none; color: #fff; font-size: 11px; font-weight: 800; cursor: pointer; letter-spacing: 0.05em;">SAVE</button>
+                        <span id="dash-lang-locked" style="font-size: 10px; color: var(--muted); display:none;">🔒 Pro feature</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- E. KNOWLEDGE MATRIX HEATMAP -->
+            <div class="dash-card" style="padding: 30px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                    <div>
+                        <div class="card-meta">Knowledge Matrix</div>
+                        <div style="font-size: 18px; font-weight: 800;">Learning Momentum</div>
+                    </div>
+                    <button id="library-btn" class="btn-primary-rect" style="padding: 12px 24px; font-size: 11px;">OPEN ARCHIVE</button>
+                </div>
+                <div id="activity-heatmap" style="display: grid; grid-template-columns: repeat(52, 1fr); gap: 4px; height: 100px;"></div>
+                <div style="display: flex; justify-content: space-between; margin-top: 15px; font-size: 10px; color: var(--muted); font-weight: 800;">
+                    <span>JAN</span><span>FEB</span><span>MAR</span><span>APR</span><span>MAY</span><span>JUN</span>
+                    <span>JUL</span><span>AUG</span><span>SEP</span><span>OCT</span><span>NOV</span><span>DEC</span>
+                </div>
+            </div>
+
+            <!-- F. GLOBAL SCALE -->
+            <div style="text-align: center; padding: 32px; opacity: 0.4;">
+                <div class="card-meta" style="margin-bottom: 5px;">Global Intelligence Capacity</div>
+                <div id="dash-global-count" style="font-family: 'JetBrains Mono'; font-size: 24px; font-weight: 800; letter-spacing: -1px;">1,240,402 PAGES</div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- ONBOARDING OVERLAY -->
+    <div id="onboarding-overlay" class="overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 2000; align-items: center; justify-content: center;">
+        <div class="onboarding-card" style="background: #050505; border: 1px solid var(--border); border-radius: 32px; width: 450px; padding: 40px;">
+            <!-- Step 1: Goal -->
+            <div id="step-goal" class="onboarding-step active">
+                <div class="onboarding-title" style="font-size: 24px; font-weight: 900; margin-bottom: 10px;">Select Mission focus</div>
+                <div class="onboarding-subtitle" style="color: var(--muted); font-size: 13px; margin-bottom: 25px;">Personalize advisor tuning for your study path.</div>
+                <div class="option-grid" style="display: grid; gap: 10px;">
+                    <button class="option-btn" data-goal="Learning">
+                        <span class="option-name">🎓 Undergrad / College</span>
+                    </button>
+                    <button class="option-btn" data-goal="Exam">
+                        <span class="option-name">🏛️ Competitive Exams</span>
+                    </button>
+                    <button class="option-btn" data-goal="Professional">
+                        <span class="option-name">💼 Professional Certs</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Path -->
+            <div id="step-path" class="onboarding-step" style="display: none;">
+                <div class="onboarding-title">Select Your Path.</div>
+                <div id="path-options" class="option-grid" style="display: grid; gap: 10px; margin-top: 20px;"></div>
+            </div>
+
+            <!-- Step 3: Location -->
+            <div id="step-location" class="onboarding-step" style="display: none;">
+                <div class="onboarding-title">Regional Protocol.</div>
+                <div style="background: var(--surface-raised); padding: 20px; border-radius: 12px; margin: 20px 0;">
+                    <div style="font-weight: 800; font-size: 15px;" id="detected-country-name">Detecting...</div>
+                </div>
+                <select id="country-selector" style="width: 100%; border-radius: 12px; padding: 15px; background: var(--surface-raised); color: #fff; border: 1px solid var(--border); margin-bottom: 20px;">
+                    <option value="IN">India Jurisdiction (₹)</option>
+                    <option value="GLOBAL">Global Jurisdiction ($)</option>
+                </select>
+                <button id="confirm-onboarding-btn" class="btn-primary-rect" style="width: 100%;">ESTABLISH CONNECTION</button>
+            </div>
+
+            <!-- Step 4: Success -->
+            <div id="step-success" class="onboarding-step" style="display: none; text-align: center;">
+                <div style="font-size: 64px; margin-bottom: 20px;">⚡</div>
+                <div class="onboarding-title">Connection Established.</div>
+                <button id="final-start-btn" class="btn-primary-rect" style="width: 100%; margin-top: 20px;">ENTER COMMAND CENTER</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script type="module" src="index.js"></script>
+</body>
+</html>

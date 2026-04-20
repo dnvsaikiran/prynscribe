@@ -1,0 +1,207 @@
+/* content/indicators.css */
+
+.prysm-indicator-base {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 2147483647;
+    pointer-events: auto;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+.prysm-indicator-shape {
+    width: 12px;
+    height: 12px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+/* 1. PULSE (Default) */
+.style-pulse .prysm-indicator-shape {
+    background: #3b82f6;
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+    animation: prysm-pulse 2s infinite;
+}
+
+/* 2. STAR */
+.style-star .prysm-indicator-shape {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23fbbf24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>');
+    animation: prysm-twinkle 1.5s infinite;
+}
+
+/* 3. HEART */
+.style-heart .prysm-indicator-shape {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23f43f5e"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>');
+    animation: prysm-beat 0.8s infinite;
+}
+
+/* 4. COMET */
+.style-comet .prysm-indicator-shape {
+    background: linear-gradient(90deg, #fff, rgba(255,255,255,0));
+    width: 20px; height: 4px; border-radius: 2px;
+    animation: prysm-slide 1s infinite linear;
+}
+
+/* 5. GHOST */
+.style-ghost .prysm-indicator-shape {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23ffffff"><path d="M12 2a9 9 0 0 0-9 9v7.5a1 1 0 0 0 1.62.77L6 18l1.38 1.27a1 1 0 0 0 1.24 0L10 18l1.38 1.27a1 1 0 0 0 1.24 0L14 18l1.38 1.27a1 1 0 0 0 1.24 0L18 18l1.38 1.27A1 1 0 0 0 21 18.5V11a9 9 0 0 0-9-9zM9 11a1 1 0 1 1-1-1 1 1 0 0 1 1 1zm8 0a1 1 0 1 1-1-1 1 1 0 0 1 1 1z"/></svg>');
+    opacity: 0.6;
+    animation: prysm-float 3s infinite ease-in-out;
+}
+
+/* 6. BOLT */
+.style-bolt .prysm-indicator-shape {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23eab308"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>');
+    animation: prysm-flicker 0.2s infinite;
+}
+
+/* 7. RING */
+.style-ring .prysm-indicator-shape {
+    border: 2px solid #a855f7;
+    border-radius: 50%;
+    background: transparent;
+    animation: prysm-expand 1.5s infinite;
+}
+
+/* 8. NINJA */
+.style-ninja .prysm-indicator-shape {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2364748b"><path d="M12 2l2.4 7.2 7.2 2.4-7.2 2.4L12 22l-2.4-7.2L2.4 12l7.2-2.4L12 2z"/></svg>');
+    animation: prysm-rotate 2s infinite linear;
+}
+
+/* 9. DROP */
+.style-drop .prysm-indicator-shape {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%230ea5e9"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>');
+    animation: prysm-pulse 1.5s infinite;
+}
+
+/* 10. FIRE */
+.style-fire .prysm-indicator-shape {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23f97316"><path d="M12 2c0 0-2 4-2 6s1 3 2 3 2-1 2-3-2-6-2-6zm0 10c-3 0-6 3-6 7s3 3 6 3 6-1 6-3-3-7-6-7z"/></svg>');
+    animation: prysm-flicker 0.5s infinite;
+}
+
+/* 11. MOON */
+.style-moon .prysm-indicator-shape {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23e2e8f0"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>');
+    animation: prysm-twinkle 4s infinite;
+}
+
+/* 12. SUN */
+.style-sun .prysm-indicator-shape {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23facc15"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.58 5.42l1.42-1.42"/></svg>');
+    animation: prysm-rotate 10s infinite linear;
+}
+
+/* 13. SHIELD */
+.style-shield .prysm-indicator-shape {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%2322c55e" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>');
+    animation: prysm-pulse 2s infinite;
+}
+
+/* 14. LEAF */
+.style-leaf .prysm-indicator-shape {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2310b981"><path d="M11 2a10 10 0 0 1 10 10c0 5-5 10-10 10s-10-5-10-10A10 10 0 0 1 11 2z"/></svg>');
+    animation: prysm-float 4s infinite;
+}
+
+/* 15. CROSS */
+.style-cross .prysm-indicator-shape {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23ef4444"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>');
+    animation: prysm-rotate 1s infinite steps(4);
+}
+
+/* 16. HEX */
+.style-hex .prysm-indicator-shape {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%238b5cf6"><path d="M12 2.1l8.7 5v10l-8.7 5L3.3 17.1v-10l8.7-5z"/></svg>');
+    animation: prysm-pulse 1s infinite alternate;
+}
+
+/* 17. ORBIT */
+.style-orbit .prysm-indicator-shape {
+    background: #fff;
+    border-radius: 50%;
+    width: 6px; height: 6px;
+    position: relative;
+}
+.style-orbit::after {
+    content: '';
+    position: absolute;
+    width: 4px; height: 4px;
+    background: #6366f1;
+    border-radius: 50%;
+    top: -8px; left: 50%;
+    margin-left: -2px;
+    transform-origin: 2px 20px;
+    animation: prysm-rotate 1s infinite linear;
+}
+
+/* 18. SPARKLE */
+.style-sparkle .prysm-indicator-shape {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23fff"><path d="M12 3l1.9 5.8 6.1.3-4.8 3.8 1.5 6.1-5-3.5-5 3.5 1.5-6.1-4.8-3.8 6.1-.3z"/></svg>');
+    animation: prysm-flicker 0.1s infinite alternate;
+}
+
+/* 19. WAVE */
+.style-wave .prysm-indicator-shape {
+    width: 20px; height: 2px;
+    background: #3b82f6;
+    animation: prysm-wave 1s infinite ease-in-out;
+}
+
+/* 20. DIAMOND */
+.style-diamond .prysm-indicator-shape {
+    width: 10px; height: 10px;
+    background: #06b6d4;
+    transform: rotate(45deg);
+    animation: prysm-rotate 4s infinite linear;
+}
+
+/* Animations */
+@keyframes prysm-pulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+    70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+@keyframes prysm-twinkle {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(0.8); }
+}
+@keyframes prysm-beat {
+    0%, 100% { transform: scale(1); }
+    15% { transform: scale(1.3); }
+    30% { transform: scale(1.1); }
+    45% { transform: scale(1.4); }
+}
+@keyframes prysm-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+@keyframes prysm-rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+@keyframes prysm-expand {
+    0% { transform: scale(0.1); opacity: 1; }
+    100% { transform: scale(2); opacity: 0; }
+}
+@keyframes prysm-flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+@keyframes prysm-slide {
+    0% { transform: translateX(-20px); opacity: 0; }
+    50% { opacity: 1; }
+    100% { transform: translateX(20px); opacity: 0; }
+}
+@keyframes prysm-wave {
+    0%, 100% { clip-path: inset(0 0 0 0); }
+    50% { clip-path: inset(0 50% 0 0); }
+}

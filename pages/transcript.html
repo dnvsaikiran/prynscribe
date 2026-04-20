@@ -50,14 +50,28 @@
         }
         .btn-black-pill:hover { transform: scale(1.05); background: #222; }
 
-        /* Centered Reading Layout */
         .workspace-main {
-            max-width: 1000px; /* Increased width */
+            max-width: 1100px;
             margin: 0 auto;
             padding: 80px 40px;
+            position: relative;
         }
-        .lecture-header { margin-bottom: 80px; text-align: center; }
-        .lecture-title { font-size: 4.5rem; letter-spacing: -3px; line-height: 1; margin-bottom: 20px; }
+        .lecture-header { 
+            margin-bottom: 80px; 
+            text-align: left; 
+            position: relative;
+        }
+        .lecture-title { font-size: 4rem; letter-spacing: -2px; line-height: 1.1; margin-bottom: 20px; max-width: 80%; }
+        
+        .lecture-tags-top-right {
+            position: absolute;
+            top: 0;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-end;
+        }
 
         /* Summary Area Optimization */
         #summary-sheet-content {
@@ -128,6 +142,7 @@
         </div>
         <div style="display:flex; gap:12px;">
             <button id="export-notion" class="btn-black-pill">Export to Notion</button>
+            <button id="export-anki" class="btn-black-pill" style="background:var(--accent); color:#fff; border:none;">Export to Anki</button>
             <button id="export-notebook" class="btn-black-pill">Export to NotebookLLM</button>
             <button id="export-md" class="btn-black-pill">Print to PDF</button>
         </div>
@@ -136,24 +151,22 @@
     <!-- HORIZONTAL NAV BAR -->
     <nav class="top-nav-bar">
         <div class="top-nav-item active" data-target="section-summary-sheet">Summary Sheet</div>
-        <div class="top-nav-item mode-exam-only" data-target="section-mindmap">Mindmap</div>
-        <div class="top-nav-item mode-exam-only" data-target="section-quiz">15-MCQ Evaluation</div>
-        <div class="top-nav-item mode-exam-only" data-target="section-flashcards">Flashcards</div>
-        <div class="top-nav-item" data-target="section-chat" style="color: #6366f1;">Neural Consultant</div>
-        <div class="top-nav-item mode-exam-only" data-target="section-analysis">Critical Analysis</div>
-        <div class="top-nav-item mode-exam-only" data-target="section-timeline">Development Timeline</div>
-        <div class="top-nav-item" data-target="section-history">History</div>
-        <div class="top-nav-item mode-exam-only" data-target="section-mains">Mains Thinking Engine</div>
+        <div class="top-nav-item mode-exam-only" data-target="section-mindmap">Concept Cartography</div>
+        <div class="top-nav-item" data-target="section-history">History & Evolution</div>
+        <div class="top-nav-item" data-target="section-quiz" id="nav-quiz">Neural Evaluation</div>
+        <div class="top-nav-item mode-exam-only" data-target="section-flashcards">Active Recall</div>
+        <div class="top-nav-item mode-exam-only" data-target="section-mains">Mains Thinking</div>
         <div class="top-nav-item" data-target="section-glossary">Glossary</div>
         <div class="top-nav-item" data-target="section-suggestions">Suggestions</div>
-        <div class="top-nav-item" data-target="section-full-transcript" style="opacity: 0.6;">Word-to-Word Teacher Transcript</div>
+        <div class="top-nav-item" data-target="section-chat" style="color: #6366f1;">Neural Consultant</div>
+        <div class="top-nav-item" data-target="section-full-transcript" style="opacity: 0.6;">Verbatim Transcript</div>
     </nav>
 
     <main class="workspace-main">
         <header class="lecture-header">
-            <div style="font-size:11px; font-weight:900; color:var(--accent); text-transform:uppercase; letter-spacing:0.3em; margin-bottom:20px;">Session Intelligence Artifact</div>
+            <div style="font-size:11px; font-weight:900; color:var(--accent); text-transform:uppercase; letter-spacing:0.3em; margin-bottom:15px;">Session Intelligence Artifact</div>
             <h1 id="lecture-title-s" class="lecture-title">Study Artifact</h1>
-            <div id="lecture-tags" style="display:flex; justify-content:center; gap:8px; margin-top:10px;"></div>
+            <div id="lecture-tags" class="lecture-tags-top-right"></div>
         </header>
 
         <div class="suite-container">
@@ -191,11 +204,26 @@
             </section>
 
             <section id="section-mains" class="suite-section mode-exam-only"><h2 class="section-title">Mains Practice</h2><div id="mains-questions" class="pro-card"></div></section>
+            
+            <section id="section-history" class="suite-section">
+                <h2 class="section-title">History & Chronological Evolution</h2>
+                <div id="history-content" class="pro-card serif-font" style="line-height:2; font-size:1.2rem;">Analyzing chronology...</div>
+            </section>
+
             <section id="section-glossary" class="suite-section"><h2 class="section-title">Glossary</h2><div id="glossary-list" class="pro-card"></div></section>
+            
+            <section id="section-suggestions" class="suite-section">
+                <h2 class="section-title">Intelligent Roadmap & Suggestions</h2>
+                <div id="suggestions-content" class="pro-card"></div>
+            </section>
 
             <section id="section-full-transcript" class="suite-section">
                 <h2 class="section-title">Word-to-Word Transcript</h2>
-                <div id="full-transcript-content" class="pro-card serif-font" style="line-height:2.4; font-size:1.3rem; max-height:80vh; overflow-y:auto;">Scribing archive...</div>
+                <div id="full-transcript-content" class="pro-card serif-font" style="line-height:2.4; font-size:1.3rem; max-height:80vh; overflow-y:auto; padding: 40px;">
+                    Scribing archive...
+                </div>
+                <!-- Hidden player for alignment -->
+                <audio id="alignment-player" style="display:none;"></audio>
             </section>
         </div>
     </main>

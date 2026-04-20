@@ -1,0 +1,260 @@
+/* ============================================================
+   PRYNSCRIBE — DARK LUXURY MODE SYSTEM CSS
+   "The Intelligence Interface"
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  /* Core Palette */
+  --ps-bg:          hsl(224, 22%, 5%);
+  --ps-surface:     hsl(224, 18%, 9%);
+  --ps-raised:      hsl(224, 16%, 13%);
+  --ps-border:      hsl(224, 14%, 18%);
+  --ps-border-glow: hsl(252, 60%, 28%);
+
+  /* Typography */
+  --ps-text:        hsl(210, 20%, 96%);
+  --ps-muted:       hsl(215, 14%, 55%);
+  --ps-mono:        'JetBrains Mono', monospace;
+
+  /* Mode accent colors */
+  --accent-exam:        hsl(252, 90%, 68%);
+  --accent-summary:     hsl(210, 90%, 68%);
+  --accent-podcast:     hsl(30, 90%, 65%);
+  --accent-memory:      hsl(170, 80%, 55%);
+  --accent-problem:     hsl(190, 90%, 60%);
+  --accent-interview:   hsl(45, 100%, 60%);
+  --accent-notes:       hsl(280, 70%, 65%);
+  --accent-productivity:hsl(350, 80%, 65%);
+  --accent-research:    hsl(155, 75%, 55%);
+  --accent-auto:        hsl(320, 85%, 70%);
+}
+
+/* ---- BASE ---- */
+.mode-system * { box-sizing: border-box; margin: 0; padding: 0; }
+
+.mode-system {
+  font-family: 'Outfit', sans-serif;
+  background: var(--ps-bg);
+  color: var(--ps-text);
+  padding: 24px;
+  min-height: 100vh;
+}
+
+/* ---- CATEGORY HEADERS ---- */
+.mode-category-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--ps-muted);
+  margin: 28px 0 12px;
+}
+
+/* ---- MODE GRID ---- */
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+/* ---- MODE CARD ---- */
+.mode-card {
+  position: relative;
+  background: var(--ps-surface);
+  border: 1px solid var(--ps-border);
+  border-radius: 16px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  user-select: none;
+}
+
+.mode-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 50% 0%, var(--card-accent-color, hsl(252,90%,68%)) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.mode-card:hover::before, .mode-card.active::before { opacity: 0.07; }
+.mode-card:hover { border-color: var(--card-accent-color, hsl(252,90%,68%)); transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+.mode-card.active { border-color: var(--card-accent-color, hsl(252,90%,68%)); background: var(--ps-raised); }
+.mode-card.active::after {
+  content: '';
+  position: absolute;
+  top: 10px; right: 10px;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--card-accent-color, hsl(252,90%,68%));
+  box-shadow: 0 0 8px var(--card-accent-color, hsl(252,90%,68%));
+}
+
+/* Locked (tier gate) */
+.mode-card.locked { opacity: 0.45; cursor: not-allowed; }
+.mode-card.locked:hover { transform: none; }
+.mode-card .lock-badge {
+  position: absolute;
+  top: 10px; right: 10px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: var(--ps-raised);
+  color: var(--ps-muted);
+  border: 1px solid var(--ps-border);
+}
+
+/* Auto Mode badge */
+.mode-card.auto-mode {
+  background: linear-gradient(135deg, hsl(280,30%,10%) 0%, hsl(224,22%,9%) 100%);
+  border-color: hsl(320, 40%, 30%);
+  grid-column: span 2;
+}
+.mode-card.auto-mode::before { background: radial-gradient(circle at 50% 0%, hsl(320,85%,70%) 0%, transparent 70%); }
+.mode-card.auto-badge {
+  position: absolute;
+  top: 12px; right: 12px;
+  font-size: 8px; font-weight: 900;
+  letter-spacing: 0.1em;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: hsl(320, 85%, 70%);
+  color: #000;
+}
+
+/* Card internals */
+.mode-emoji {
+  font-size: 22px;
+  margin-bottom: 10px;
+  display: block;
+  filter: drop-shadow(0 2px 8px var(--card-accent-color, transparent));
+  transition: transform 0.2s ease;
+}
+.mode-card:hover .mode-emoji { transform: scale(1.15); }
+
+.mode-label {
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 4px;
+  color: var(--ps-text);
+}
+
+.mode-tagline {
+  font-size: 10px;
+  color: var(--ps-muted);
+  line-height: 1.4;
+}
+
+/* ---- XP PROGRESS BAR ---- */
+.xp-bar-wrap {
+  background: var(--ps-surface);
+  border: 1px solid var(--ps-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.xp-level-badge {
+  width: 38px; height: 38px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, hsl(252,90%,68%), hsl(320,85%,70%));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 900;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px hsl(252,90%,40%,0.4);
+}
+
+.xp-meta { flex: 1; }
+.xp-labels { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.xp-name { font-size: 11px; font-weight: 800; }
+.xp-count { font-size: 10px; color: var(--ps-muted); font-family: var(--ps-mono); }
+
+.xp-bar-track {
+  height: 5px;
+  background: var(--ps-raised);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.xp-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, hsl(252,90%,68%), hsl(320,85%,70%));
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 0 8px hsl(252,90%,68%,0.5);
+}
+
+/* ---- CONFIRM BUTTON ---- */
+.mode-confirm-btn {
+  width: 100%;
+  margin-top: 20px;
+  padding: 14px;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, hsl(252,90%,60%), hsl(280,80%,55%));
+  color: #fff;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 20px hsl(252,90%,40%,0.3);
+}
+.mode-confirm-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 28px hsl(252,90%,40%,0.5); }
+.mode-confirm-btn:active { transform: translateY(0); }
+.mode-confirm-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* ---- STREAK BANNER ---- */
+.streak-banner {
+  background: linear-gradient(135deg, hsl(30,90%,12%), hsl(224,22%,9%));
+  border: 1px solid hsl(30,60%,25%);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 16px;
+}
+.streak-fire { font-size: 18px; }
+.streak-count { font-size: 14px; font-weight: 900; color: hsl(30,90%,65%); }
+.streak-label { font-size: 10px; color: var(--ps-muted); }
+
+/* ---- TIER UPGRADE CTA ---- */
+.tier-cta {
+  background: linear-gradient(135deg, hsl(40,80%,10%), hsl(224,22%,9%));
+  border: 1px solid hsl(45,60%,25%);
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: center;
+  margin-top: 16px;
+}
+.tier-cta-title { font-size: 12px; font-weight: 900; color: hsl(45,100%,65%); margin-bottom: 4px; }
+.tier-cta-sub { font-size: 10px; color: var(--ps-muted); margin-bottom: 10px; }
+.tier-cta-btn {
+  display: inline-block;
+  padding: 8px 20px;
+  border-radius: 99px;
+  background: hsl(45,100%,60%);
+  color: #000;
+  font-size: 10px; font-weight: 900;
+  border: none; cursor: pointer;
+  letter-spacing: 0.1em;
+  transition: all 0.2s;
+}
+.tier-cta-btn:hover { transform: scale(1.05); }
+
+/* ---  Responsive for tight extension popup (400px) --- */
+@media (max-width: 420px) {
+  .mode-grid { grid-template-columns: repeat(2, 1fr); }
+  .mode-card.auto-mode { grid-column: span 2; }
+}

@@ -9,10 +9,11 @@
     "tabCapture",
     "offscreen",
     "scripting",
-    "identity"
+    "identity",
+    "tabs"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self' https://www.gstatic.com; object-src 'self'"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' data: https://*.googleapis.com https://*.supabase.co https://api.groq.com https://api.deepgram.com"
   },
   "background": {
     "service_worker": "background/service_worker.js",
@@ -45,6 +46,14 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "externally_connectable": {
+    "matches": [
+      "https://unamoikkxjwdiyjetbyn.supabase.co/*",
+      "https://prynsc-scribe.web.app/*",
+      "http://localhost/*",
+      "http://127.0.0.1/*"
+    ]
   },
   "host_permissions": ["<all_urls>"]
 }

@@ -1,0 +1,28 @@
+{
+    "regions": [
+        {"id": "IN", "name": "India", "currency": "INR", "symbol": "₹"},
+        {"id": "US", "name": "United States", "currency": "USD", "symbol": "$"},
+        {"id": "UK", "name": "United Kingdom", "currency": "GBP", "symbol": "£"},
+        {"id": "GLOBAL", "name": "International / Other", "currency": "USD", "symbol": "$"}
+    ],
+    "goals": [
+        {"id": "competitive", "name": "Competitive Exams"},
+        {"id": "university", "name": "University Admissions"},
+        {"id": "professional", "name": "Professional Certifications"},
+        {"id": "general", "name": "General Learning / Podcast"}
+    ],
+    "paths": {
+        "IN": {
+            "competitive": ["UPSC", "JEE", "NEET", "CAT", "GATE"],
+            "university": ["CUET", "DU Entrance", "State Entrance"],
+            "professional": ["CA", "CS", "MBA", "CFA"],
+            "general": ["Podcast Mode", "Personal Case Studies"]
+        },
+        "GLOBAL": {
+            "competitive": ["LSAT", "LNAT", "Bar Exam"],
+            "university": ["GRE", "GMAT", "SAT", "IELTS", "TOEFL", "MCAT"],
+            "professional": ["CFA", "CPA", "PMP", "ACCA"],
+            "general": ["Podcast Mode", "Industry Case Studies", "General Productivity"]
+        }
+    }
+}

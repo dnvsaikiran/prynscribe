@@ -12,5 +12,9 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "commonjs",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.104.0",
+    "firebase": "^12.12.0"
+  }
 }

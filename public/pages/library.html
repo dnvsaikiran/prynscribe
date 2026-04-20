@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intellectual Archive - PrynScribe</title>
+    <link rel="stylesheet" href="../css/theme.css">
+    <style>
+        :root {
+            --accent: #6366f1;
+            --bg: #000;
+            --surface: #0a0a0a;
+            --surface-light: #111;
+            --text: #fff;
+            --text-muted: #666;
+            --border: #222;
+        }
+
+        body { 
+            background: var(--bg); 
+            color: var(--text); 
+            font-family: 'Inter', sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            line-height: 1.6;
+        }
+
+        /* Navigation Header */
+        nav {
+            padding: 24px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            box-sizing: border-box;
+        }
+
+        .nav-brand {
+            font-size: 24px;
+            font-weight: 900;
+            letter-spacing: -1.5px;
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .page-container {
+            padding: 120px 40px 60px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header-row {
+            margin-bottom: 48px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .archive-title {
+            font-size: 48px;
+            font-weight: 900;
+            letter-spacing: -2px;
+            margin: 0;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .search-input {
+            flex: 1;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 20px;
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--text-muted);
+        }
+
+        .filter-select {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 20px;
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .lecture-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 24px;
+        }
+
+        .lecture-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .lecture-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--text-muted);
+            background: var(--surface-light);
+        }
+
+        .card-tag {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin: 0;
+            line-height: 1.3;
+        }
+
+        .card-meta {
+            color: var(--text-muted);
+            font-size: 13px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .card-footer {
+            margin-top: auto;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .btn-pill {
+            padding: 12px 24px;
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid var(--border);
+            background: var(--surface-light);
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .btn-pill-primary {
+            background: var(--text);
+            color: var(--bg);
+            border: none;
+        }
+
+        .btn-pill:hover {
+            transform: translateY(-2px);
+            border-color: var(--text-muted);
+        }
+
+        #no-lectures {
+            text-align: center;
+            padding: 80px 0;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/" class="nav-brand">PRYNSCRIBE</a>
+        <div class="nav-links">
+            <a href="/" class="btn-pill" style="font-size: 11px; padding: 8px 20px;">DASHBOARD</a>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <div class="header-row">
+            <div>
+                <div class="card-tag">INTELLECTUAL VAULT</div>
+                <h1 class="archive-title">Your Archive.</h1>
+            </div>
+            <a href="/" class="btn-pill btn-pill-primary">New Recording</a>
+        </div>
+
+        <div class="search-row">
+            <input type="text" id="search-input" class="search-input" placeholder="Search transcripts, topics, or insights...">
+            <select id="filter-subject" class="filter-select">
+                <option value="">All Subjects</option>
+                <option value="Polity">Polity</option>
+                <option value="Economy">Economy</option>
+                <option value="History">History</option>
+                <option value="Geography">Geography</option>
+            </select>
+        </div>
+
+        <div id="no-lectures" style="display: none;">
+            <p>The archive is empty. Begin your first transcription.</p>
+        </div>
+
+        <div id="library-grid" class="lecture-grid">
+            <!-- Cards will be injected here -->
+        </div>
+    </div>
+
+    <script type="module" src="library.js"></script>
+</body>
+</html>

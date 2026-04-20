@@ -1,412 +1,307 @@
 // popup/popup.js
-// Handles UI orchestration for the PrynScribe Pro "Zinc" Dashboard.
+import { getFullTranscript } from '../lib/db.js';
 
-import { getFullTranscript, getLecture } from '../lib/db.js';
-import { auth, googleProvider, signInWithPopup, signOut, onAuthStateChanged } from '../lib/firebase_config.js';
+// UI Elements
+let actionBtn, actionBtnText, speedSlider, speedIndicator, timerDisplay, statusTicker, verbatimBox;
+let webAccountLink, emergencyReset, waveViz, timerDigits;
 
+// Local State
 let isRecording = false;
 let isSynthesizing = false;
 let timerInterval = null;
 let telemetryInterval = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
-    const actionBtn = document.getElementById('actionBtn');
-    const actionBtnText = actionBtn.querySelector('span');
-    const statusLabel = document.getElementById('status-label');
-    const waveViz = document.getElementById('wave-viz');
-    const speedSlider = document.getElementById('speed-slider');
-    const speedIndicator = document.getElementById('speed-indicator');
-    const volumeSlider = document.getElementById('volume-slider');
-    const volumeIndicator = document.getElementById('volume-indicator');
-    const viewLibrary = document.getElementById('view-library');
-    const settingsBtn = document.getElementById('settings-btn');
-    const settingsPanel = document.getElementById('settings-panel');
-    const saveSettings = document.getElementById('save-settings');
-    const accountBtn = document.getElementById('account-btn');
-    const accountPanel = document.getElementById('account-panel');
-    const loginBtn = document.getElementById('login-btn');
-    const planType = document.getElementById('plan-type');
-
-    // Firebase Auth State Listener
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            loginBtn.textContent = 'LOGOUT';
-            planType.textContent = 'PRO USER'; // You can link this to actual Firestore data later
-            document.getElementById('usage-stats').textContent = `Logged in as: ${user.email}`;
-        } else {
-            loginBtn.textContent = 'LOGIN WITH GOOGLE';
-            planType.textContent = 'FREE TIER';
-            document.getElementById('usage-stats').textContent = '45 / 100 Transcription Minutes';
-        }
-    });
-
-    loginBtn.addEventListener('click', async () => {
-        if (auth.currentUser) {
-            await signOut(auth);
-        } else {
-            try {
-                statusLabel.textContent = "AUTHENTICATING...";
-                await signInWithPopup(auth, googleProvider);
-                statusLabel.textContent = "SYSTEM CONNECTED";
-            } catch (error) {
-                console.error("Auth Error:", error);
-                statusLabel.textContent = "AUTH FAILED";
-            }
-        }
-    });
-    const state = await chrome.storage.local.get([
-        'isRecording', 
-        'isSynthesizing',
-        'currentSpeed', 
-        'currentVolume',
-        'recordingStartTime',
-        'deepgram_api_key',
-        'groq_api_key',
-        'gemini_api_key'
-    ]);
-
-    // Populate keys in settings
-    if (state.deepgram_api_key) document.getElementById('deepgram-key').value = state.deepgram_api_key;
-    if (state.groq_api_key) document.getElementById('groq-key').value = state.groq_api_key;
-    if (state.gemini_api_key) document.getElementById('gemini-key').value = state.gemini_api_key;
-
-    isRecording = state.isRecording || false;
-    isSynthesizing = state.isSynthesizing || false;
-
-    if (state.currentSpeed) {
-        speedSlider.value = state.currentSpeed;
-        speedIndicator.textContent = `${parseFloat(state.currentSpeed).toFixed(1)}x`;
-    }
-    if (state.currentVolume !== undefined) {
-        volumeSlider.value = state.currentVolume;
-        volumeIndicator.textContent = `${state.currentVolume}%`;
+    initElements();
+    initEventListeners();
+    
+    // Auth Check
+    const state = await chrome.storage.local.get(['userProfile']);
+    if (!state.userProfile) {
+        if (statusTicker) statusTicker.textContent = "AUTH REQUIRED";
     }
 
-    // Helper to send messages with automatic "Hot Injection"
-    const sendTabMessage = async (msg) => {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!tab || !tab.url || tab.url.startsWith('chrome://')) return;
-        try {
-            await chrome.tabs.sendMessage(tab.id, msg);
-        } catch (e) {
-            try {
-                await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ['content/script.js'] });
-                await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ['content/inject.js'], world: 'MAIN' });
-                setTimeout(() => chrome.tabs.sendMessage(tab.id, msg).catch(() => {}), 200);
-            } catch (err) {}
-        }
-    };
-
-    updateUI(isRecording, isSynthesizing);
-
-    if (isRecording && state.recordingStartTime) {
-        startTimer(state.recordingStartTime);
-    } else if (!isSynthesizing) {
-        try {
-            chrome.runtime.sendMessage({ type: 'control', action: 'prepare' }).catch(() => {});
-            sendTabMessage({ type: 'ping' });
-        } catch (e) {}
-    }
-
-    // Listen for storage changes (to detect when synthesis finishes while popup is open)
-    chrome.storage.onChanged.addListener((changes) => {
-        if (changes.isSynthesizing) {
-            isSynthesizing = changes.isSynthesizing.newValue;
-            updateUI(isRecording, isSynthesizing);
-        }
-        if (changes.progress_text || changes.last_error) {
-            updateUI(isRecording, isSynthesizing);
-        }
-    });
-
-    speedSlider.addEventListener('input', (e) => {
-        const speed = e.target.value;
-        speedIndicator.textContent = `${parseFloat(speed).toFixed(1)}x`;
-        chrome.storage.local.set({ currentSpeed: speed });
-        sendTabMessage({ type: 'setSpeed', speed: parseFloat(speed) });
-    });
-
-    volumeSlider.addEventListener('input', (e) => {
-        const volume = e.target.value;
-        volumeIndicator.textContent = `${volume}%`;
-        chrome.storage.local.set({ currentVolume: volume });
-        sendTabMessage({ type: 'setVolume', volume: parseInt(volume) });
-    });
-
-    actionBtn.addEventListener('click', async () => {
-        if (isSynthesizing) return; // Prevent multiple starts
-        
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!tab || !tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://')) {
-            statusLabel.textContent = "RESTRICTED PAGE";
-            statusLabel.style.color = '#f87171';
-            return;
-        }
-
-        if (!isRecording) {
-            // IMMEDIATE Capture call to preserve user gesture
-            chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id }, async (streamId) => {
-                if (chrome.runtime.lastError || !streamId) {
-                    const err = chrome.runtime.lastError?.message || "Capture Denied";
-                    console.error("[Popup] Tab Capture Error:", err);
-                    statusLabel.textContent = "CAPTURE DENIED";
-                    statusLabel.style.color = '#f87171';
-                    return;
-                }
-                startFlow(tab, streamId);
-            });
-        } else {
-            stopFlow();
-        }
-    });
-
-    async function startFlow(tab, streamId) {
-        if (!chrome.runtime?.id) {
-           statusLabel.textContent = "REFRESH TAB";
-           return;
-        }
-
-        const keys = await chrome.storage.local.get(['deepgram_api_key', 'groq_api_key']);
-        if (!keys.deepgram_api_key && !keys.groq_api_key) {
-           statusLabel.textContent = "KEY REQUIRED";
-           settingsPanel.style.display = 'block';
-           return;
-        }
-
-        const lectureId = Date.now();
-        const startTime = Date.now();
-        const mode = document.getElementById('notesStyle').value;
-        const currentSpeed = parseFloat(speedSlider.value) || 1.0;
-
-        // Clear old errors and set new session
-        await chrome.storage.local.set({ 
-            isRecording: true, 
-            recordingStartTime: startTime, 
-            currentLectureId: lectureId,
-            last_error: null,
-            progress_text: null,
-            sessionSpeed: currentSpeed // Store speed for recorder to use
-        });
-
-        isRecording = true;
-        updateUI(true, false);
-        startTimer(startTime);
-
-        chrome.runtime.sendMessage({ 
-            type: 'control', action: 'start', lectureId, streamId, mode, speed: currentSpeed 
-        }, () => {
-            chrome.tabs.sendMessage(tab.id, { type: 'control', action: 'start' });
-        });
-    }
-
-    async function stopFlow() {
-        isRecording = false;
-        isSynthesizing = true;
-        updateUI(false, true);
-        stopTimer(false); // Pause but don't reset UI yet
-
-        const current = await chrome.storage.local.get(['currentLectureId']);
-        chrome.runtime.sendMessage({ type: 'control', action: 'stop', lectureId: current.currentLectureId }, () => {
-            chrome.storage.local.set({ isRecording: false, recordingStartTime: null });
-        });
-    }
-
-    settingsBtn.addEventListener('click', () => {
-        settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
-        accountPanel.style.display = 'none';
-    });
-
-    accountBtn.addEventListener('click', () => {
-        accountPanel.style.display = accountPanel.style.display === 'none' ? 'block' : 'none';
-        settingsPanel.style.display = 'none';
-    });
-
-    viewLibrary.addEventListener('click', () => {
-        chrome.tabs.create({ url: chrome.runtime.getURL('pages/library.html') });
-    });
-
-    saveSettings.addEventListener('click', async () => {
-        const dKey = document.getElementById('deepgram-key').value.trim();
-        const gKey = document.getElementById('groq-key').value.trim();
-        const gemKey = document.getElementById('gemini-key').value.trim();
-
-        await chrome.storage.local.set({ 
-            deepgram_api_key: dKey, 
-            groq_api_key: gKey,
-            gemini_api_key: gemKey
-        });
-
-        saveSettings.textContent = "SYNCED";
-        setTimeout(() => { 
-            saveSettings.textContent = "SYNC KEY PROTOCOLS"; 
-        }, 1000);
-    });
-
-    // --- AUTO-SAVE LOGIC FOR INDIVIDUAL KEYS ---
-    const keysMap = {
-        'deepgram-key': 'deepgram_api_key',
-        'groq-key': 'groq_api_key',
-        'gemini-key': 'gemini_api_key'
-    };
-
-    Object.entries(keysMap).forEach(([elementId, storageKey]) => {
-        const input = document.getElementById(elementId);
-        const status = document.getElementById(`${elementId}-status`);
-        
-        if (input) {
-            input.addEventListener('input', async (e) => {
-                const value = e.target.value.trim();
-                await chrome.storage.local.set({ [storageKey]: value });
-                
-                if (status) {
-                    status.style.opacity = '1';
-                    setTimeout(() => { status.style.opacity = '0'; }, 1000);
-                }
-            });
-        }
-    });
-
-    const panicBtn = document.getElementById('panic-btn');
-    if (panicBtn) {
-        panicBtn.addEventListener('click', async () => {
-            const current = await chrome.storage.local.get(['currentLectureId']);
-            if (current.currentLectureId) {
-                // Set the current lecture to error in DB to stop polling
-                try {
-                    const { updateLecture } = await import('../lib/db.js');
-                    await updateLecture(current.currentLectureId, { status: 'error', error_message: "User Terminated Session" });
-                } catch (e) {}
-            }
-
-            await chrome.storage.local.set({ 
-                isSynthesizing: false, 
-                isRecording: false, 
-                progress_text: null, 
-                last_error: "SYSTEM HARD RESET COMPLETE",
-                currentLectureId: null 
-            });
-            panicBtn.textContent = "SYSTEM RESET";
-            setTimeout(() => location.reload(), 1000);
-        });
-    }
+    restoreState();
+    initLanguageIndicator();
 });
 
-async function updateUI(recording, synthesizing) {
-    const actionBtn = document.getElementById('actionBtn');
-    const actionBtnText = actionBtn.querySelector('span');
-    const statusLabel = document.getElementById('status-label');
-    const waveViz = document.getElementById('wave-viz');
+function initElements() {
+    actionBtn = document.getElementById('actionBtn');
+    actionBtnText = document.getElementById('action-text');
+    speedSlider = document.getElementById('speed-slider');
+    speedIndicator = document.getElementById('speed-indicator');
+    timerDisplay = document.getElementById('timer-display');
+    statusTicker = document.getElementById('status-ticker');
+    verbatimBox = document.getElementById('popup-verbatim');
+    webAccountLink = document.getElementById('web-account-link');
+    emergencyReset = document.getElementById('btn-emergency-reset');
+    waveViz = document.getElementById('wave-viz');
+    timerDigits = document.getElementById('timer-display');
+}
+
+function initEventListeners() {
+    if (speedSlider) {
+        speedSlider.addEventListener('input', async (e) => {
+            const speed = e.target.value;
+            if (speedIndicator) speedIndicator.textContent = `${parseFloat(speed).toFixed(1)}x`;
+            await chrome.storage.local.set({ currentSpeed: speed });
+            await safeSendSpeed(parseFloat(speed));
+        });
+    }
+
+    if (actionBtn) actionBtn.addEventListener('click', handleActionClick);
+    if (webAccountLink) webAccountLink.addEventListener('click', () => chrome.tabs.create({ url: "https://prynsc-scribe.web.app" }));
     
-    // Check for persisted errors in the background
-    const current = await chrome.storage.local.get(['currentLectureId']);
-    let errorMessage = null;
-    if (current.currentLectureId) {
-        // We'd need to fetch the lecture from DB, but for now we'll check a dedicated error key
-        const err = await chrome.storage.local.get(['last_error']);
-        errorMessage = err.last_error;
+    if (emergencyReset) {
+        emergencyReset.addEventListener('click', async () => {
+            if (confirm("TERMINATE SESSION?")) {
+                await chrome.storage.local.set({ isRecording: false, isSynthesizing: false });
+                chrome.runtime.sendMessage({ type: 'control', action: 'stop' });
+                location.reload();
+            }
+        });
     }
 
-    if (synthesizing || recording) {
-        document.getElementById('telemetry-panels').style.display = 'block';
-    } else {
-        document.getElementById('telemetry-panels').style.display = 'none';
-        if (telemetryInterval) clearInterval(telemetryInterval);
-    }
-
-    if (synthesizing) {
-        const prog = await chrome.storage.local.get(['progress_text']);
-        actionBtnText.textContent = prog.progress_text || "TRANSCRIBING...";
-        actionBtn.style.background = '#71717a'; 
-        actionBtn.style.opacity = '0.5';
-        actionBtn.style.pointerEvents = 'none';
-        statusLabel.textContent = "INTELLIGENCE IN PROGRESS";
-        statusLabel.style.color = '#6366f1';
-        waveViz.style.display = 'none'; // Fixed: Hide red waves during synthesis
-        chrome.storage.local.set({ last_error: null });
-
-        // Start Telemetry
-        if (telemetryInterval) clearInterval(telemetryInterval);
-        if (current.currentLectureId) {
-            telemetryInterval = setInterval(async () => {
-                try {
-                    const rawText = await getFullTranscript(current.currentLectureId);
-                    const verbEl = document.getElementById('popup-verbatim');
-                    
-                    if (rawText && rawText.length > 5) {
-                        verbEl.textContent = rawText;
-                    } else {
-                        verbEl.textContent = `[Deepgram Connection Active] Waiting for AI Text Stream...`;
-                    }
-                    verbEl.scrollTop = verbEl.scrollHeight;
-
-                    const lecture = await getLecture(current.currentLectureId);
-                    if (lecture) {
-                        if (lecture.master_data) {
-                            document.getElementById('popup-synthesis').textContent = JSON.stringify(lecture.master_data).substring(0, 500) + "...";
-                        }
-                        if (lecture.status === 'error') {
-                            verbEl.textContent = "CRITICAL ERROR: " + lecture.error_message;
-                        }
-                    }
-                } catch(e) {
-                    console.error("Telemetry Error:", e);
+    const modeBtns = document.querySelectorAll('.mode-btn');
+    if (modeBtns) {
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (isRecording) {
+                    alert("Cannot change mode while a recording session is active.");
+                    return;
                 }
-            }, 1000);
+                modeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const newMode = btn.dataset.mode;
+                await chrome.storage.local.set({ currentMode: newMode });
+                console.log("[Popup] Mode changed to:", newMode);
+            });
+        });
+    }
+
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+        if (namespace === 'local') {
+            if (changes.isSynthesizing) { isSynthesizing = changes.isSynthesizing.newValue; updateUI(); }
+            if (changes.isRecording) { 
+                isRecording = changes.isRecording.newValue; 
+                if (isRecording) { startTelemetryLoop(); timerDigits?.classList.add('active'); }
+                else { stopTelemetryLoop(); timerDigits?.classList.remove('active'); }
+                updateUI(); 
+            }
+            if (changes.progress_text) { if (statusTicker) statusTicker.textContent = changes.progress_text.newValue.toUpperCase(); }
         }
-    } else if (recording) {
-        actionBtnText.textContent = "STOP SESSION";
-        actionBtn.style.background = '#ef4444'; 
-        actionBtn.style.opacity = '1';
-        actionBtn.style.pointerEvents = 'auto';
-        statusLabel.textContent = "SESSION IN PROGRESS";
-        waveViz.style.display = 'flex';
-        
-        // Show live scribe during recording too
-        if (telemetryInterval) clearInterval(telemetryInterval);
-        telemetryInterval = setInterval(async () => {
-            try {
-                const current = await chrome.storage.local.get(['currentLectureId']);
-                if (!current.currentLectureId) return;
-                
-                const rawText = await getFullTranscript(current.currentLectureId);
-                const verbEl = document.getElementById('popup-verbatim');
-                
-                if (rawText && rawText.length > 5) {
-                    verbEl.textContent = rawText;
-                } else {
-                    verbEl.textContent = "Listening for audio...";
-                }
-                verbEl.scrollTop = verbEl.scrollHeight;
-            } catch(e) {}
-        }, 1000);
+    });
 
+    chrome.runtime.onMessage.addListener((msg) => {
+        if (msg.type === 'signal_level') {
+            if (waveViz && isRecording) {
+                waveViz.style.opacity = '1';
+                const bars = waveViz.querySelectorAll('.wave-bar-pro');
+                bars.forEach((bar, i) => {
+                    // Parabolic center-weighted distribution for 14 bars
+                    const distanceToCenter = Math.abs(i - 6.5); // Center is between 6 and 7
+                    const weight = 1.0 - (distanceToCenter / 10);
+                    const height = Math.min(100, Math.max(15, msg.level * weight * 1.5)) + '%';
+                    bar.style.height = height;
+                });
+            }
+        } else if (msg.type === 'transcript_update' && verbatimBox) {
+            updateVerbatimUI(msg.text);
+        } else if (msg.type === 'language_detected') {
+            updateLanguageIndicator(msg.lang);
+        } else if (msg.type === 'synthesis_complete') {
+            isSynthesizing = false;
+            chrome.storage.local.set({ isSynthesizing: false });
+            updateUI();
+            if (waveViz) waveViz.style.opacity = '0';
+            if (msg.lectureId) {
+                chrome.tabs.create({ url: chrome.runtime.getURL(`public/pages/transcript_v2.html?id=${msg.lectureId}`) });
+            }
+        }
+    });
+}
+
+/**
+ * MASTER FIX: Safely sends speed even if content script is missing or orphaned.
+ */
+async function safeSendSpeed(speed) {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) return;
+    
+    try {
+        // Try to ping the script to see if it's there
+        await chrome.tabs.sendMessage(tab.id, { type: 'ping' });
+        await chrome.tabs.sendMessage(tab.id, { type: 'setSpeed', speed });
+    } catch (e) {
+        console.log("[Popup] Content script missing or invalid. Auto-repairing...");
+        // NUCLEAR RE-INJECTION: Make speed work without reload
+        await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content/script.js']
+        });
+        // Try again after a small delay
+        setTimeout(() => chrome.tabs.sendMessage(tab.id, { type: 'setSpeed', speed }), 200);
+    }
+}
+
+function startTelemetryLoop() {
+    if (telemetryInterval) clearInterval(telemetryInterval);
+    // Increased frequency: 750ms for snappier Scribe feeling
+    telemetryInterval = setInterval(async () => {
+        const state = await chrome.storage.local.get(['currentLectureId']);
+        if (state.currentLectureId) {
+            const text = await getFullTranscript(state.currentLectureId);
+            if (text) updateVerbatimUI(text);
+        }
+    }, 750); 
+}
+
+function stopTelemetryLoop() {
+    if (telemetryInterval) clearInterval(telemetryInterval);
+    telemetryInterval = null;
+}
+
+function updateVerbatimUI(text) {
+    if (!verbatimBox) return;
+    if (!text || text.trim().length === 0) {
+        if (isRecording) verbatimBox.innerHTML = '<span style="color:rgba(255,255,255,0.3);">📍 Waiting for audio signal...</span>';
+        return;
+    }
+    const displayText = text.length > 3000 ? '...' + text.slice(-3000) : text;
+    verbatimBox.textContent = displayText;
+    verbatimBox.scrollTop = verbatimBox.scrollHeight;
+}
+
+// Language indicator flags/labels
+const LANG_META = {
+    'en':{'label':'English','flag':'🇬🇧'}, 'hi':{'label':'Hindi','flag':'🇮🇳'},
+    'te':{'label':'Telugu','flag':'🇮🇳'}, 'ta':{'label':'Tamil','flag':'🇮🇳'},
+    'kn':{'label':'Kannada','flag':'🇮🇳'}, 'ml':{'label':'Malayalam','flag':'🇮🇳'},
+    'es':{'label':'Spanish','flag':'🇪🇸'}, 'fr':{'label':'French','flag':'🇫🇷'},
+    'de':{'label':'German','flag':'🇩🇪'}, 'pt':{'label':'Portuguese','flag':'🇧🇷'},
+    'ar':{'label':'Arabic','flag':'🇸🇦'}, 'ja':{'label':'Japanese','flag':'🇯🇵'},
+    'ko':{'label':'Korean','flag':'🇰🇷'}, 'zh':{'label':'Chinese','flag':'🇨🇳'}
+};
+
+function updateLanguageIndicator(langCode) {
+    const meta = LANG_META[langCode] || { label: langCode?.toUpperCase() || 'Unknown', flag: '🌐' };
+    const flagEl = document.getElementById('source-lang-flag');
+    const labelEl = document.getElementById('source-lang-label');
+    if (flagEl) flagEl.textContent = meta.flag;
+    if (labelEl) labelEl.textContent = meta.label;
+}
+
+async function initLanguageIndicator() {
+    const state = await chrome.storage.local.get(['detectedSourceLang', 'preferredOutputLang', 'userProfile']);
+    if (state.detectedSourceLang) updateLanguageIndicator(state.detectedSourceLang);
+    const outCode = state.preferredOutputLang || 'en';
+    const outLabel = document.getElementById('output-lang-label');
+    if (outLabel) outLabel.textContent = (LANG_META[outCode]?.label) || 'English';
+    // Show 'CHANGE' button to pro/elite users
+    const tier = state.userProfile?.tier || 'free';
+    const changeBtn = document.getElementById('lang-change-btn');
+    if (changeBtn && (tier === 'pro' || tier === 'elite')) changeBtn.style.display = 'block';
+}
+
+
+async function handleActionClick() {
+    if (isSynthesizing) return;
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !tab.url || tab.url.startsWith('chrome://')) {
+        alert("Action Required: Please open a web page with audio (e.g. YouTube).");
+        return;
+    }
+
+    if (!isRecording) {
+        chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id }, async (streamId) => {
+            if (streamId) startFlow(tab, streamId);
+            else alert("System Error: No audio endpoint detected.");
+        });
     } else {
-        actionBtnText.textContent = "START SESSION";
-        actionBtn.style.background = '#ffffff'; 
-        actionBtn.style.opacity = '1';
-        actionBtn.style.pointerEvents = 'auto';
-        statusLabel.textContent = errorMessage || "SYSTEM READY";
-        if (errorMessage) statusLabel.style.color = '#f87171'; // Red for error
-        else statusLabel.style.color = 'rgba(255, 255, 255, 0.5)';
-        waveViz.style.display = 'none';
-        stopTimer(true); // Reset timer UI only when system is ready again
+        stopFlow();
+    }
+}
+
+async function startFlow(tab, streamId) {
+    const lectureId = Date.now().toString();
+    const startTime = Date.now();
+    const config = await chrome.storage.local.get(['currentMode', 'userRegion', 'currentGoal', 'currentSpeed']);
+    
+    await chrome.storage.local.set({ isRecording: true, recordingStartTime: startTime, currentLectureId: lectureId });
+    isRecording = true;
+    updateUI();
+    startTimer(startTime);
+    startTelemetryLoop();
+    
+    chrome.runtime.sendMessage({ 
+        type: 'control', 
+        action: 'start', 
+        lectureId, 
+        streamId, 
+        mode: config.currentMode || 'general',
+        goal: config.currentGoal || 'Neural Synthesis',
+        region: config.userRegion || 'GLOBAL',
+        speed: parseFloat(config.currentSpeed || 1.0) 
+    });
+    if (statusTicker) statusTicker.textContent = "NEURAL BRIDGE ACTIVE";
+}
+
+async function stopFlow() {
+    const state = await chrome.storage.local.get(['currentLectureId']);
+    isRecording = false;
+    isSynthesizing = true;
+    updateUI();
+    stopTimer();
+    stopTelemetryLoop();
+    chrome.runtime.sendMessage({ type: 'control', action: 'stop', lectureId: state.currentLectureId });
+    await chrome.storage.local.set({ isRecording: false, isSynthesizing: true });
+}
+
+async function updateUI() {
+    if (isSynthesizing) {
+        if (actionBtnText) actionBtnText.textContent = "SYNCHRONIZING...";
+        if (actionBtn) actionBtn.style.opacity = '0.5';
+    } else if (isRecording) {
+        if (actionBtnText) actionBtnText.textContent = "STOP SESSION";
+        if (actionBtn) actionBtn.style.background = '#ef4444';
+    } else {
+        if (actionBtnText) actionBtnText.textContent = "START SESSION";
+        if (actionBtn) {
+            actionBtn.style.background = '#fff';
+            actionBtn.style.opacity = '1';
+        }
+        if (statusTicker) statusTicker.textContent = "SYSTEM ACTIVE";
+    }
+}
+
+async function restoreState() {
+    const state = await chrome.storage.local.get(['isRecording', 'isSynthesizing', 'recordingStartTime', 'currentSpeed']);
+    isRecording = state.isRecording || false;
+    isSynthesizing = state.isSynthesizing || false;
+    
+    if (state.currentSpeed && speedSlider) {
+        speedSlider.value = state.currentSpeed;
+        if (speedIndicator) speedIndicator.textContent = `${parseFloat(state.currentSpeed).toFixed(1)}x`;
+    }
+
+    updateUI();
+    if (isRecording) {
+        if (state.recordingStartTime) startTimer(state.recordingStartTime);
+        startTelemetryLoop();
+        timerDigits?.classList.add('active');
     }
 }
 
 function startTimer(startTime) {
-    const timerEl = document.getElementById('timer-display');
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
         const elapsed = Date.now() - startTime;
         const mins = Math.floor(elapsed / 60000);
         const secs = Math.floor((elapsed % 60000) / 1000);
-        timerEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        if (timerDisplay) timerDisplay.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }, 1000);
 }
 
-function stopTimer(resetUI = true) {
-    const timerEl = document.getElementById('timer-display');
+function stopTimer() {
     if (timerInterval) clearInterval(timerInterval);
-    if (resetUI) timerEl.textContent = '00:00';
 }
-

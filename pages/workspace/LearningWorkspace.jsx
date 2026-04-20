@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { downloadAnkiDeck } from '../../lib/export_utils.js';
 
 /**
  * PrynScribe Premium Learning Workspace
@@ -99,10 +100,35 @@ const LearningWorkspace = ({ lectureData, onAskAI }) => {
           <div className="space-y-8 pb-32">
             {activeTab === 'summary_sheet' && (
                 <div className="bg-white rounded-2xl p-10 shadow-sm border border-slate-100 prose prose-slate max-w-none">
-                    <h3 className="text-xl font-bold mb-8">Academic Summary Sheet</h3>
+                    <h3 className="text-xl font-bold mb-8 text-slate-800">Academic Summary Sheet</h3>
                     <div className="text-slate-600 leading-8 space-y-6">
-                        {/* Render Summary Sheet Markdown here */}
                         {lectureData?.summary_sheet || lectureData?.synthesis || <div className="h-64 bg-slate-50 animate-pulse rounded-xl" />}
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'flashcards' && (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xl font-bold text-slate-800">Neural Flashcards</h3>
+                        <button 
+                            onClick={() => downloadAnkiDeck(lectureData.mcqs || lectureData.flashcards, lectureData.title)}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl text-xs font-bold shadow-lg hover:shadow-indigo-200/50 transition-all hover:-translate-y-0.5"
+                        >
+                            📥 EXPORT TO ANKI
+                        </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 gap-4">
+                        {(lectureData.mcqs || lectureData.flashcards || []).map((card, idx) => (
+                            <div key={idx} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm group hover:border-indigo-200 transition-colors">
+                                <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2">Card #{idx + 1}</div>
+                                <div className="font-semibold text-slate-800 mb-4">{card.question || card.q}</div>
+                                <div className="pt-4 border-t border-slate-50 text-sm text-slate-600 italic">
+                                    {card.answer || card.a || card.explanation}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}

@@ -8,6 +8,7 @@ let chunkTimeoutId = null;
 let activeLectureId = null;
 let sessionSpeed = 1.0;
 let sharedAudioCtx = null;
+let currentSignalLevel = 0; // Live tracking for VAD
 
 function getAudioCtx() {
     if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -15,12 +16,13 @@ function getAudioCtx() {
 }
 
 async function startRecording(streamId, lectureId, speed = 1.0) {
+  console.log(`[Recorder] Starting recording for lecture ${lectureId} with speed ${speed} and streamId ${streamId}`);
   try {
-    activeLectureId = lectureId;
+    activeLectureId = lectureId ? lectureId.toString() : null;
     sessionSpeed = speed || 1.0;
     
     // Create a new stream from the tab capture streamId
-    activeStream = await navigator.mediaDevices.getUserMedia({
+    const constraints = {
       audio: {
         mandatory: {
           chromeMediaSource: 'tab',
@@ -28,6 +30,22 @@ async function startRecording(streamId, lectureId, speed = 1.0) {
         }
       },
       video: false
+    };
+    
+    console.log("[Recorder] Calling getUserMedia with constraints:", JSON.stringify(constraints));
+    activeStream = await navigator.mediaDevices.getUserMedia(constraints);
+    console.log("[Recorder] getUserMedia success. Active tracks:", activeStream.getAudioTracks().length);
+
+    // --- TRACK TERMINATION DETECTION ---
+    activeStream.getAudioTracks().forEach(track => {
+        track.onended = () => {
+            console.warn("[Recorder] Audio track ended unexpectedly.");
+            chrome.runtime.sendMessage({ 
+                type: 'recorderError', 
+                error: 'Audio stream lost. Please ensure the tab is active and not reloaded.' 
+            });
+            stopRecording();
+        };
     });
 
     // --- LOOPBACK ---
@@ -50,7 +68,33 @@ async function startRecording(streamId, lectureId, speed = 1.0) {
     gainNode.gain.value = 5.0; 
     
     source.connect(gainNode);
-    gainNode.connect(destination);
+    
+    // --- DYNAMICS COMPRESSION (Clipping Protection) ---
+    const compressor = audioCtx.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-24, audioCtx.currentTime); // Start compressing at -24dB
+    compressor.knee.setValueAtTime(30, audioCtx.currentTime);
+    compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+    compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+    compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+    
+    gainNode.connect(compressor);
+    compressor.connect(destination);
+
+    // --- LIVE SIGNAL MONITORING ---
+    const analyzer = audioCtx.createAnalyser();
+    analyzer.fftSize = 128;
+    gainNode.connect(analyzer);
+    const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+
+    const checkSignal = setInterval(() => {
+        if (!activeLectureId) { clearInterval(checkSignal); return; }
+        analyzer.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((p, c) => p + c, 0) / dataArray.length;
+        currentSignalLevel = average; // Update for VAD logic
+        
+        // --- REAL-TIME TELEMETRY (40ms = 25fps) ---
+        chrome.runtime.sendMessage({ type: 'signal_level', level: average });
+    }, 40);
 
     // --- NUCLEAR RECORDER CYCLE ---
     const recordNextChunk = () => {
@@ -63,14 +107,17 @@ async function startRecording(streamId, lectureId, speed = 1.0) {
         });
         const currentChunkId = chunkId++;
 
+        console.log(`[Recorder] Initialized MediaRecorder for chunk ${currentChunkId}. State: ${recorder.state}`);
+
         recorder.ondataavailable = async (event) => {
+            console.log(`[Recorder] ondataavailable for chunk ${currentChunkId}. Size: ${event.data.size} bytes`);
             if (event.data && event.data.size > 2000) { 
                 try {
                     let audioData = event.data;
 
                     // --- 5X SPEED NORMALIZATION ---
                     // If speed is significantly high, we slow down the audio back to 1x pitch/speed
-                    if (sessionSpeed > 1.1) {
+                    if (sessionSpeed > 1.2) {
                         console.log(`[Recorder] Normalizing ${sessionSpeed}x chunk ${currentChunkId} (${(event.data.size/1024).toFixed(1)} KB)...`);
                         audioData = await normalizeAudioSpeed(event.data, sessionSpeed);
                         if (audioData) {
@@ -97,13 +144,36 @@ async function startRecording(streamId, lectureId, speed = 1.0) {
             }
         };
 
+        recorder.onerror = (e) => {
+            console.error(`[Recorder] MediaRecorder error for chunk ${currentChunkId}:`, e);
+        };
+
         recorder.start();
         
-        // Use 15-second chunks for better context at high speeds (15s wall-clock = 75s at 5x)
-        chunkTimeoutId = setTimeout(() => {
-            if (recorder.state === 'recording') recorder.stop();
-            if (activeLectureId) recordNextChunk();
-        }, 15000); 
+        // --- SMART VAD CHUNKING ---
+        // Basic duration: 5s for first chunk, 20s thereafter
+        const targetDuration = currentChunkId === 0 ? 5000 : 20000;
+        const maxExtension = 10000; // Max 10s extension to find silence
+        const checkInterval = 500;
+        let elapsed = 0;
+
+        const handleChunkCompletion = () => {
+            if (!activeLectureId) return;
+
+            // If we've hit target duration AND it's silent (or we hit max extension)
+            // Threshold 0.5 is very low-level background noise after 5x boost
+            const isSilent = currentSignalLevel < 0.5; 
+            
+            if ((elapsed >= targetDuration && isSilent) || elapsed >= (targetDuration + maxExtension)) {
+                if (recorder.state === 'recording') recorder.stop();
+                if (activeLectureId) recordNextChunk();
+            } else {
+                elapsed += checkInterval;
+                chunkTimeoutId = setTimeout(handleChunkCompletion, checkInterval);
+            }
+        };
+
+        chunkTimeoutId = setTimeout(handleChunkCompletion, checkInterval);
     };
 
     recordNextChunk();
@@ -167,10 +237,28 @@ async function normalizeAudioSpeed(blob, speed) {
         const source = offlineCtx.createBufferSource();
         source.buffer = audioBuffer;
         
-        // High-Quality Stretching: playbackRate 1/speed
+        // --- ClearVoice Upgrades ---
+        // 1. High-Pass Filter: Removes low-end mud/rumble (80Hz)
+        const filter = offlineCtx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 80;
+        
+        // 2. Dynamics Compressor: Toughens up the voice so words don't get 'lost'
+        const compressor = offlineCtx.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-24, offlineCtx.currentTime);
+        compressor.knee.setValueAtTime(30, offlineCtx.currentTime);
+        compressor.ratio.setValueAtTime(12, offlineCtx.currentTime);
+        compressor.attack.setValueAtTime(0.003, offlineCtx.currentTime);
+        compressor.release.setValueAtTime(0.25, offlineCtx.currentTime);
+        
+        // --- Connection Chain ---
         source.playbackRate.value = 1 / speed; 
-        source.connect(offlineCtx.destination);
+        source.connect(filter);
+        filter.connect(compressor);
+        compressor.connect(offlineCtx.destination);
+        
         source.start(0);
+        console.log(`[Recorder] ClearVoice Compression Active for ${speed}x normalize.`);
         
         const renderedBuffer = await offlineCtx.startRendering();
         console.log(`[Recorder] 3x+ Normalization complete. Duration: ${(renderedBuffer.duration).toFixed(1)}s`);
@@ -245,6 +333,11 @@ async function stopRecording() {
     heartbeatInterval = null;
   }
   
+  if (chunkTimeoutId) {
+    clearTimeout(chunkTimeoutId);
+    chunkTimeoutId = null;
+  }
+
   if (activeStream) {
       activeStream.getTracks().forEach(t => t.stop());
       activeStream = null;

@@ -1,0 +1,135 @@
+:root {
+    --primary: #6366f1;
+    --primary-glow: rgba(99, 102, 241, 0.4);
+    --bg-dark: #000000;
+    --card-bg: rgba(255, 255, 255, 0.03);
+    --card-border: rgba(255, 255, 255, 0.08);
+    --text-main: #ffffff;
+    --text-dim: rgba(255, 255, 255, 0.5);
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+    margin: 0;
+}
+
+/* Glassmorphism Card */
+.glass-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--card-border);
+    border-radius: 24px;
+    padding: 32px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 0 40px var(--primary-glow);
+    transform: translateY(-5px);
+}
+
+/* Premium Gradient Button */
+.btn-premium {
+    background: linear-gradient(135deg, var(--primary), #8b5cf6);
+    color: white;
+    border: none;
+    padding: 16px 32px;
+    border-radius: 16px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 20px rgba(99, 102, 241, 0.2);
+}
+
+.btn-premium:hover {
+    transform: scale(1.05);
+    box-shadow: 0 15px 30px rgba(99, 102, 241, 0.4);
+}
+
+/* Onboarding Steps UI */
+.step-container {
+    opacity: 0;
+    transform: translateY(20px);
+    display: none;
+    transition: all 0.5s ease;
+}
+
+.step-container.active {
+    opacity: 1;
+    transform: translateY(0);
+    display: block;
+}
+
+/* Regional Flag Badge */
+.flag-badge {
+    background: rgba(255,255,255,0.1);
+    padding: 8px 16px;
+    border-radius: 100px;
+    font-size: 14px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+   @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=JetBrains+Mono:wght@100..800&display=swap');
+
+/* overhaul.css - PrynScribe Elite Redesign */
+.glass-card {
+    background: rgba(10, 10, 10, 0.4);
+    backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 32px;
+}
+
+.header-logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    letter-spacing: -1px;
+    background: linear-gradient(to right, #fff, var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.pulsing-core {
+    animation: corePulse 2s infinite ease-in-out;
+}
+
+@keyframes corePulse {
+    0% { opacity: 0.4; transform: scale(0.98); }
+    50% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 10px var(--accent)); }
+    100% { opacity: 0.4; transform: scale(0.98); }
+}
+
+.btn-rect-mini {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 950;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+}
+
+/* Scrollbar Elite */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-raised); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+}
+
+/* Animations */
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+}
+
+.floating { animation: float 6s ease-in-out infinite; }
