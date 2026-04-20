@@ -62,6 +62,22 @@ function initEventListeners() {
         });
     }
 
+    // Mode sheet open/close (replaces removed inline onclick — CSP compliant)
+    const modeTrigger = document.getElementById('mode-trigger-bar');
+    const modeSheet   = document.getElementById('mode-sheet');
+    const modeClose   = document.getElementById('mode-sheet-close');
+
+    if (modeTrigger && modeSheet) {
+        modeTrigger.addEventListener('click', () => { modeSheet.style.display = 'block'; });
+    }
+    if (modeClose && modeSheet) {
+        modeClose.addEventListener('click', () => { modeSheet.style.display = 'none'; });
+    }
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modeSheet) modeSheet.style.display = 'none';
+    });
+
     const modeBtns = document.querySelectorAll('.mode-btn');
     if (modeBtns) {
         modeBtns.forEach(btn => {

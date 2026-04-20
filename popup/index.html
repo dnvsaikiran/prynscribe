@@ -90,8 +90,7 @@
 
     <!-- 0. MODE SELECTOR (New Elite System) -->
     <div id="mode-trigger-bar" 
-         style="display:flex; align-items:center; justify-content:space-between; background:#080808; border:1px solid rgba(255,255,255,0.06); border-radius:14px; padding: 10px 14px; cursor:pointer;"
-         onclick="document.getElementById('mode-sheet').style.display = 'block'">
+         style="display:flex; align-items:center; justify-content:space-between; background:#080808; border:1px solid rgba(255,255,255,0.06); border-radius:14px; padding: 10px 14px; cursor:pointer;">
         <div style="display:flex; align-items:center; gap:8px;">
             <span id="active-mode-emoji" style="font-size:16px;">✨</span>
             <div>
@@ -106,7 +105,7 @@
     <div id="mode-sheet" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:500; overflow-y:auto;">
         <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; position:sticky; top:0; background:#010101; border-bottom:1px solid rgba(255,255,255,0.06);">
             <div style="font-size:13px; font-weight:900;">Choose Mode</div>
-            <button onclick="document.getElementById('mode-sheet').style.display='none'" 
+            <button id="mode-sheet-close"
                     style="background:rgba(255,255,255,0.06); border:none; color:#fff; border-radius:99px; padding:6px 14px; font-size:10px; font-weight:800; cursor:pointer;">CLOSE ✕</button>
         </div>
         <div id="mode-selector-root" style="padding:4px;"></div>
